@@ -116,6 +116,11 @@ class ResourceInventoryService:
                 stats["rows_valid"] -= 1
                 continue
                 
+            # EC2 Resource Name Fix: Fallback to AWS Name tag if available
+            if provider == CloudProvider.AWS and r.resource_type == "ec2/instance":
+                if r.cloud_tags and r.cloud_tags.get("Name"):
+                    r.resource_name = r.cloud_tags.get("Name")
+                
             res_hash = hashlib.sha256(r.resource_id.encode('utf-8')).hexdigest()
             
             identifier = r.account_id or r.account_name
