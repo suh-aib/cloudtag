@@ -1,0 +1,35 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+venv/
+env/
+.env
+*.db
+*.sqlite3
+coverage.xml
+htmlcov/
+.coverage
+.coverage.*
+
+# Node / JS
+node_modules/
+dist/
+build/
+.next/
+out/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo

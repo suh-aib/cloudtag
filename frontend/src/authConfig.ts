@@ -1,0 +1,20 @@
+import { PublicClientApplication } from "@azure/msal-browser";
+import type { Configuration } from "@azure/msal-browser";
+
+export const msalConfig: Configuration = {
+  auth: {
+    clientId: import.meta.env.VITE_ENTRA_CLIENT_ID || "placeholder-client-id",
+    authority: `https://login.microsoftonline.com/${import.meta.env.VITE_ENTRA_TENANT_ID || "common"}`,
+    redirectUri: "/",
+    postLogoutRedirectUri: "/"
+  },
+  cache: {
+    cacheLocation: "sessionStorage"
+  }
+};
+
+export const loginRequest = {
+  scopes: ["User.Read"]
+};
+
+export const msalInstance = new PublicClientApplication(msalConfig);
