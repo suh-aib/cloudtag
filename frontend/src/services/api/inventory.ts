@@ -86,3 +86,28 @@ export const getAzureResources = async (token: string, accountId: string, resour
   });
   return response.data;
 };
+
+export const getAWSRegions = async (token: string, accountId: string): Promise<ResourceGroupCount[]> => {
+  const response = await axios.get(`${API_BASE_URL}/api/inventory/aws/accounts/${encodeURIComponent(accountId)}/regions`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const getAWSResourceTypes = async (token: string, accountId: string, region: string): Promise<ResourceTypeCount[]> => {
+  const response = await axios.get(`${API_BASE_URL}/api/inventory/aws/accounts/${encodeURIComponent(accountId)}/regions/${encodeURIComponent(region)}/types`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};
+
+export const getAWSResources = async (token: string, accountId: string, region: string, resourceType?: string): Promise<ResourceDetail[]> => {
+  let url = `${API_BASE_URL}/api/inventory/aws/accounts/${encodeURIComponent(accountId)}/regions/${encodeURIComponent(region)}/resources`;
+  if (resourceType) {
+    url += `?type=${encodeURIComponent(resourceType)}`;
+  }
+  const response = await axios.get(url, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return response.data;
+};

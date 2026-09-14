@@ -10,6 +10,9 @@ import AzureResourceGroups from "./pages/user/AzureResourceGroups";
 import AzureResourceTypes from "./pages/user/AzureResourceTypes";
 import AzureResourceList from "./pages/user/AzureResourceList";
 import AWS from "./pages/user/AWS";
+import AWSRegions from "./pages/user/AWSRegions";
+import AWSTypes from "./pages/user/AWSTypes";
+import AWSResources from "./pages/user/AWSResources";
 import MyTagging from "./pages/user/MyTagging";
 import SavedTags from "./pages/user/SavedTags";
 import MySubmissions from "./pages/user/MySubmissions";
@@ -52,6 +55,9 @@ function App() {
               <Route path="azure/:subscription/:resourceGroup" element={<AzureResourceTypes />} />
               <Route path="azure/:subscription/:resourceGroup/:resourceType" element={<AzureResourceList />} />
               <Route path="aws" element={<AWS />} />
+              <Route path="aws/:accountId" element={<AWSRegions />} />
+              <Route path="aws/:accountId/:region" element={<AWSTypes />} />
+              <Route path="aws/:accountId/:region/:resourceType" element={<AWSResources />} />
               <Route path="my-tagging" element={<MyTagging />} />
               <Route path="saved-tags" element={<SavedTags />} />
               <Route path="my-submissions" element={<MySubmissions />} />

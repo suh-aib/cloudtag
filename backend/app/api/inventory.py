@@ -268,3 +268,129 @@ def get_azure_resources(
         ))
         
     return results
+
+@router.get("/aws/accounts/{account_identifier}/regions", response_model=List[ResourceGroupCountSchema])
+def get_aws_regions(
+    account_identifier: str = Path(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    account = db.query(CloudAccount).filter(
+        CloudAccount.account_identifier == account_identifier,
+        CloudAccount.cloud == CloudProvider.AWS
+    ).first()
+    
+    if not account:
+        raise HTTPException(status_code=404, detail="AWS account not found.")
+
+    results = db.query(
+        Resource.location,
+        func.count(Resource.id).label("resource_count"),
+        func.count(func.distinct(Resource.resource_type)).label("types_count")
+    ).filter(
+        Resource.cloud_account_id == account.id,
+        Resource.provider == CloudProvider.AWS,
+        Resource.location != None
+    ).group_by(
+        Resource.location
+    ).all()
+
+    groups = []
+    for r in results:
+        groups.append(ResourceGroupCountSchema(
+            name=r.location,
+            locations=[r.location],
+            resource_count=r.resource_count,
+            types_count=r.types_count
+        ))
+        
+    return groups
+
+@router.get("/aws/accounts/{account_identifier}/regions/{region}/types", response_model=List[ResourceTypeCountSchema])
+def get_aws_resource_types(
+    account_identifier: str = Path(...),
+    region: str = Path(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    account = db.query(CloudAccount).filter(
+        CloudAccount.account_identifier == account_identifier,
+        CloudAccount.cloud == CloudProvider.AWS
+    ).first()
+    
+    if not account:
+        raise HTTPException(status_code=404, detail="AWS account not found.")
+
+    results = db.query(
+        Resource.resource_type,
+        func.count(Resource.id).label("resource_count")
+    ).filter(
+        Resource.cloud_account_id == account.id,
+        Resource.provider == CloudProvider.AWS,
+        Resource.location == region
+    ).group_by(
+        Resource.resource_type
+    ).all()
+
+    types = []
+    for r in results:
+        display = r.resource_type.split('/')[-1] if '/' in r.resource_type else r.resource_type
+        types.append(ResourceTypeCountSchema(
+            resource_type=r.resource_type,
+            display_name=display,
+            resource_count=r.resource_count
+        ))
+        
+    return types
+
+@router.get("/aws/accounts/{account_identifier}/regions/{region}/resources", response_model=List[ResourceDetailSchema])
+def get_aws_resources(
+    account_identifier: str = Path(...),
+    region: str = Path(...),
+    type: Optional[str] = Query(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    account = db.query(CloudAccount).filter(
+        CloudAccount.account_identifier == account_identifier,
+        CloudAccount.cloud == CloudProvider.AWS
+    ).first()
+    
+    if not account:
+        raise HTTPException(status_code=404, detail="AWS account not found.")
+
+    query = db.query(Resource).filter(
+        Resource.cloud_account_id == account.id,
+        Resource.provider == CloudProvider.AWS,
+        Resource.location == region
+    )
+    
+    if type:
+        query = query.filter(Resource.resource_type == type)
+        
+    resources = query.all()
+    
+    results = []
+    for r in resources:
+        status = "NOT_REVIEWED"
+        if r.tag_states:
+            statuses = [ts.status for ts in r.tag_states]
+            if any(s != "NOT_REVIEWED" for s in statuses):
+                for s in statuses:
+                    if s != "NOT_REVIEWED":
+                        status = s
+                        break
+
+        results.append(ResourceDetailSchema(
+            id=r.id,
+            resource_name=r.resource_name,
+            resource_type=r.resource_type,
+            resource_group=r.resource_group,
+            location=r.location,
+            resource_id=r.resource_id,
+            cloud_tags=r.cloud_tags,
+            tagging_scope=r.tagging_scope,
+            status=status
+        ))
+        
+    return results

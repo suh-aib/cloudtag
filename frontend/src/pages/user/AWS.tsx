@@ -4,7 +4,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from ".
 import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { getProviderAccounts, type InventoryAccount } from "../../services/api/inventory";
 
@@ -100,8 +100,10 @@ export default function AWS() {
                       <Button variant="outline" size="sm" className="h-8 border-purple-200 text-purple-700 hover:bg-purple-50" onClick={() => navigate(`/bulk-tagging/wizard?provider=AWS&scopeType=AWS_ACCOUNT&accountId=${encodeURIComponent(acc.account_identifier)}`)}>
                         Bulk Tag
                       </Button>
-                      <Button variant="ghost" size="sm" className="h-8 text-aws hover:bg-aws-light">
-                        View
+                      <Button variant="ghost" size="sm" className="h-8 text-aws hover:bg-aws-light" asChild>
+                        <Link to={`/aws/${encodeURIComponent(acc.account_identifier)}`}>
+                          View
+                        </Link>
                       </Button>
                     </TableCell>
                   </TableRow>
