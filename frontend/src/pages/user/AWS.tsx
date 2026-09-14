@@ -1,8 +1,9 @@
-import { Server, Search, Filter } from "lucide-react";
+import { Server } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/Table";
-import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
+import { InventoryFilters } from "../../components/ui/InventoryFilters";
+import type { InventoryFilters as APIFilters } from "../../services/api/inventory";
 import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
@@ -13,12 +14,13 @@ export default function AWS() {
   const navigate = useNavigate();
   const [accounts, setAccounts] = useState<InventoryAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [filters, setFilters] = useState<APIFilters>({});
 
   useEffect(() => {
     setIsLoading(true);
     getToken().then(token => {
       if (token) {
-        getProviderAccounts(token, 'aws')
+        getProviderAccounts(token, 'aws', filters)
           .then(data => {
             setAccounts(data);
           })
@@ -28,7 +30,7 @@ export default function AWS() {
         setIsLoading(false);
       }
     });
-  }, [getToken]);
+  }, [getToken, filters]);
   return (
     <div className="space-y-6 max-w-6xl mx-auto py-2">
       <div className="flex justify-between items-start">
@@ -45,17 +47,12 @@ export default function AWS() {
       </div>
 
       <Card className="shadow-sm border-gray-200">
-        <div className="p-4 border-b border-gray-200 flex gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <Input
-              placeholder="Search accounts..."
-              className="pl-10 bg-gray-50/50"
-            />
-          </div>
-          <Button variant="outline" className="gap-2 text-gray-600">
-            <Filter size={16} /> Filter
-          </Button>
+        <div className="p-4 border-b border-gray-200">
+          <InventoryFilters 
+            onFiltersChange={setFilters} 
+            showLocationFilter={false}
+            showResourceTypeFilter={false}
+          />
         </div>
         <CardContent className="p-0">
           <Table>

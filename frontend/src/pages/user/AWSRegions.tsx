@@ -1,12 +1,41 @@
-import { Cloud, Search, Filter, ChevronRight, Folder } from "lucide-react";
+import { Cloud, ChevronRight, Folder } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/Table";
-import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
+import { InventoryFilters } from "../../components/ui/InventoryFilters";
+import type { InventoryFilters as APIFilters } from "../../services/api/inventory";
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { getAWSRegions, getProviderAccounts, type ResourceGroupCount } from "../../services/api/inventory";
+
+
+const AWS_REGION_NAMES: Record<string, string> = {
+  "us-east-1": "US East (N. Virginia)",
+  "us-east-2": "US East (Ohio)",
+  "us-west-1": "US West (N. California)",
+  "us-west-2": "US West (Oregon)",
+  "af-south-1": "Africa (Cape Town)",
+  "ap-east-1": "Asia Pacific (Hong Kong)",
+  "ap-south-1": "Asia Pacific (Mumbai)",
+  "ap-northeast-2": "Asia Pacific (Seoul)",
+  "ap-southeast-1": "Asia Pacific (Singapore)",
+  "ap-southeast-2": "Asia Pacific (Sydney)",
+  "ap-northeast-1": "Asia Pacific (Tokyo)",
+  "ca-central-1": "Canada (Central)",
+  "eu-central-1": "Europe (Frankfurt)",
+  "eu-west-1": "Europe (Ireland)",
+  "eu-west-2": "Europe (London)",
+  "eu-south-1": "Europe (Milan)",
+  "eu-west-3": "Europe (Paris)",
+  "eu-north-1": "Europe (Stockholm)",
+  "me-south-1": "Middle East (Bahrain)",
+  "sa-east-1": "South America (São Paulo)"
+};
+
+const getRegionDisplayName = (region: string) => {
+  return AWS_REGION_NAMES[region] ? `${AWS_REGION_NAMES[region]} (${region})` : region;
+};
 
 export default function AWSRegions() {
   const { accountId } = useParams<{ accountId: string }>();
@@ -15,6 +44,7 @@ export default function AWSRegions() {
   const [regions, setRegions] = useState<ResourceGroupCount[]>([]);
   const [accountName, setAccountName] = useState<string>(accountId || '');
   const [isLoading, setIsLoading] = useState(true);
+  const [filters, setFilters] = useState<APIFilters>({});
 
   useEffect(() => {
     if (!accountId) return;
@@ -23,8 +53,8 @@ export default function AWSRegions() {
       if (token) {
 
         Promise.all([
-          getAWSRegions(token, accountId),
-          getProviderAccounts(token, 'aws')
+          getAWSRegions(token, accountId, filters),
+          getProviderAccounts(token, 'aws', filters)
         ])
           .then(([regionsData, accountsData]) => {
             setRegions(regionsData);
@@ -39,7 +69,7 @@ export default function AWSRegions() {
         setIsLoading(false);
       }
     });
-  }, [getToken, accountId]);
+  }, [getToken, accountId, filters]);
 
   const totalResources = regions.reduce((acc, curr) => acc + curr.resource_count, 0);
 
@@ -77,25 +107,19 @@ export default function AWSRegions() {
       </div>
 
       <Card className="shadow-sm border-gray-200">
-        <div className="p-4 border-b border-gray-200 flex gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <Input
-              placeholder="Search regions..."
-              className="pl-10 bg-gray-50/50"
-            />
-          </div>
-          <Button variant="outline" className="gap-2 text-gray-600">
-            <Filter size={16} /> Filter
-          </Button>
+        <div className="p-4 border-b border-gray-200">
+          <InventoryFilters 
+            onFiltersChange={setFilters} 
+            showLocationFilter={false}
+            showResourceTypeFilter={false}
+          />
         </div>
         <CardContent className="p-0">
           <Table>
             <TableHeader className="bg-gray-50">
               <TableRow>
                 <TableHead className="font-semibold text-gray-700">Region</TableHead>
-                <TableHead className="font-semibold text-gray-700">Region(s)</TableHead>
-                <TableHead className="font-semibold text-gray-700 text-center">Resource Types</TableHead>
+                                <TableHead className="font-semibold text-gray-700 text-center">Resource Types</TableHead>
                 <TableHead className="font-semibold text-gray-700 text-center">Resources</TableHead>
                 <TableHead className="w-48 text-right"></TableHead>
               </TableRow>
@@ -120,8 +144,7 @@ export default function AWSRegions() {
               ) : (
                 regions.map(regionObj => (
                   <TableRow key={regionObj.name} className="hover:bg-gray-50/50">
-                    <TableCell className="font-medium text-gray-900">{regionObj.name}</TableCell>
-                    <TableCell className="text-gray-500 text-xs">{regionObj.locations.join(', ') || 'N/A'}</TableCell>
+                    <TableCell className="font-medium text-gray-900">{getRegionDisplayName(regionObj.name)}</TableCell>
                     <TableCell className="text-center">{regionObj.types_count}</TableCell>
                     <TableCell className="text-center">
                       <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-aws-light text-aws">
@@ -129,7 +152,7 @@ export default function AWSRegions() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right space-x-2">
-                      <Button variant="outline" size="sm" className="h-8 border-purple-200 text-purple-700 hover:bg-purple-50" onClick={() => navigate(`/bulk-tagging/wizard?provider=AZURE&scopeType=RESOURCE_GROUP&accountId=${encodeURIComponent(accountId || '')}&resourceGroup=${encodeURIComponent(regionObj.name)}`)}>
+                      <Button variant="outline" size="sm" className="h-8 border-purple-200 text-purple-700 hover:bg-purple-50" onClick={() => navigate(`/bulk-tagging/wizard?provider=AWS&scopeType=REGION&accountId=${encodeURIComponent(accountId || '')}&region=${encodeURIComponent(regionObj.name)}`)}>
                         Bulk Tag
                       </Button>
                       <Button variant="ghost" size="sm" className="h-8 text-aws hover:bg-aws-light" asChild>

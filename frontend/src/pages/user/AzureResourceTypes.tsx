@@ -1,7 +1,9 @@
-import { Cloud, Search, Filter, ChevronRight, Layers, ArrowRight } from "lucide-react";
+import { Cloud, ChevronRight, Layers, ArrowRight } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/Card";
-import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
+import { Badge } from "../../components/ui/Badge";
+import { InventoryFilters } from "../../components/ui/InventoryFilters";
+import type { InventoryFilters as APIFilters } from "../../services/api/inventory";
 import { useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
@@ -14,6 +16,7 @@ export default function AzureResourceTypes() {
   const [types, setTypes] = useState<ResourceTypeCount[]>([]);
   const [accountName, setAccountName] = useState<string>(subscription || '');
   const [isLoading, setIsLoading] = useState(true);
+  const [filters, setFilters] = useState<APIFilters>({});
 
   useEffect(() => {
     if (!subscription || !resourceGroup) return;
@@ -21,8 +24,8 @@ export default function AzureResourceTypes() {
     getToken().then(token => {
       if (token) {
         Promise.all([
-          getAzureResourceTypes(token, subscription, resourceGroup),
-          getProviderAccounts(token, 'azure')
+          getAzureResourceTypes(token, subscription, resourceGroup, filters),
+          getProviderAccounts(token, 'azure', filters)
         ])
           .then(([data, accountsData]) => {
             setTypes(data);
@@ -37,7 +40,7 @@ export default function AzureResourceTypes() {
         setIsLoading(false);
       }
     });
-  }, [getToken, subscription, resourceGroup]);
+  }, [getToken, subscription, resourceGroup, filters]);
 
   const totalResources = types.reduce((acc, curr) => acc + curr.resource_count, 0);
 
@@ -78,17 +81,12 @@ export default function AzureResourceTypes() {
         </div>
       </div>
 
-      <div className="flex gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <Input
-            placeholder="Search resource types..."
-            className="pl-10 bg-white border-gray-200"
-          />
-        </div>
-        <Button variant="outline" className="gap-2 text-gray-600 bg-white">
-          <Filter size={16} /> Filter
-        </Button>
+      <div className="bg-white p-4 border border-gray-200 rounded-lg shadow-sm mb-6">
+        <InventoryFilters 
+          onFiltersChange={setFilters} 
+          showLocationFilter={false}
+          showResourceTypeFilter={true}
+        />
       </div>
 
       {isLoading ? (
@@ -108,7 +106,19 @@ export default function AzureResourceTypes() {
                 <CardContent className="p-6 flex flex-col h-full justify-between gap-4">
                   <div>
                     <h3 className="font-bold text-lg text-gray-900 mb-1 truncate">{type.display_name}</h3>
-                    <p className="text-xs text-gray-500 font-mono truncate">{type.resource_type}</p>
+                    <p className="text-xs text-gray-500 font-mono truncate mb-2">{type.resource_type}</p>
+                    <div className="flex gap-2 mb-2">
+                      {type.billability && (
+                        <Badge variant={type.billability === 'BILLABLE' ? 'success' : type.billability === 'NON_BILLABLE' ? 'secondary' : 'warning'}>
+                          {type.billability}
+                        </Badge>
+                      )}
+                      {type.tagging_scope && (
+                        <Badge variant={type.tagging_scope === 'REQUIRED' ? 'destructive' : type.tagging_scope === 'SUPPORTING' ? 'secondary' : 'outline'}>
+                          {type.tagging_scope}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
                   <div className="flex items-center justify-between mt-2">
                     <span className="inline-flex items-center px-2.5 py-1 rounded-md text-sm font-medium bg-azure-light text-azure">

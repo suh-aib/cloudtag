@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from typing import List, Optional
 from fastapi import Query
 
 from app.database import get_db
 from app.models.user import User
 from app.models.cloud import CloudProvider, CloudAccount
-from app.models.resource import Resource, TaggingScope
+from app.models.resource import Resource, TaggingScope, Billability
 from app.api.deps import get_current_user
 from app.schemas.inventory import (
     DashboardStatsSchema, InventoryAccountSchema,
@@ -15,6 +15,46 @@ from app.schemas.inventory import (
 )
 
 router = APIRouter()
+
+def apply_inventory_filters(query, search=None, billable_only=False, billability=None, tagging_scope=None, resource_type=None, location=None):
+    if billable_only:
+        query = query.filter(Resource.billability == Billability.BILLABLE)
+    elif billability:
+        query = query.filter(Resource.billability == billability)
+        
+    if tagging_scope:
+        query = query.filter(Resource.tagging_scope == tagging_scope)
+        
+    if resource_type:
+        query = query.filter(Resource.resource_type == resource_type)
+        
+    if location:
+        query = query.filter(Resource.location == location)
+        
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                Resource.resource_name.ilike(search_term),
+                Resource.resource_id.ilike(search_term),
+                Resource.resource_type.ilike(search_term),
+                Resource.location.ilike(search_term),
+                Resource.resource_group.ilike(search_term),
+            )
+        )
+    return query
+
+def apply_account_search(query, search=None):
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                CloudAccount.name.ilike(search_term),
+                CloudAccount.account_identifier.ilike(search_term)
+            )
+        )
+    return query
+
 
 def get_provider_enum(provider_str: str) -> CloudProvider:
     provider_str = provider_str.upper()
@@ -94,6 +134,10 @@ def get_dashboard_stats(
 @router.get("/{provider}/accounts", response_model=List[InventoryAccountSchema])
 def get_provider_accounts(
     provider: str = Path(...),
+    search: Optional[str] = Query(None),
+    billable_only: bool = Query(False),
+    billability: Optional[str] = Query(None),
+    tagging_scope: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -104,7 +148,7 @@ def get_provider_accounts(
     else:
         group_expr = Resource.location
         
-    results = db.query(
+    base_query = db.query(
         CloudAccount.id.label("account_id"),
         CloudAccount.name.label("account_name"),
         CloudAccount.account_identifier.label("account_identifier"),
@@ -114,7 +158,14 @@ def get_provider_accounts(
         Resource, Resource.cloud_account_id == CloudAccount.id
     ).filter(
         Resource.provider == provider_enum
-    ).group_by(
+    )
+    
+    # Apply Resource filters to ensure counts are accurate
+    base_query = apply_inventory_filters(base_query, search=None, billable_only=billable_only, billability=billability, tagging_scope=tagging_scope)
+    # Apply Account search
+    base_query = apply_account_search(base_query, search=search)
+    
+    results = base_query.group_by(
         CloudAccount.id, CloudAccount.name, CloudAccount.account_identifier
     ).all()
     
@@ -134,6 +185,10 @@ def get_provider_accounts(
 @router.get("/azure/accounts/{account_identifier}/resource-groups", response_model=List[ResourceGroupCountSchema])
 def get_azure_resource_groups(
     account_identifier: str = Path(...),
+    search: Optional[str] = Query(None),
+    billable_only: bool = Query(False),
+    billability: Optional[str] = Query(None),
+    tagging_scope: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -146,7 +201,7 @@ def get_azure_resource_groups(
     if not account:
         raise HTTPException(status_code=404, detail="Azure account not found.")
 
-    results = db.query(
+    base_query = db.query(
         Resource.resource_group,
         func.count(Resource.id).label("resource_count"),
         func.count(func.distinct(Resource.resource_type)).label("types_count"),
@@ -155,7 +210,10 @@ def get_azure_resource_groups(
         Resource.cloud_account_id == account.id,
         Resource.provider == CloudProvider.AZURE,
         Resource.resource_group != None
-    ).group_by(
+    )
+    
+    base_query = apply_inventory_filters(base_query, search=search, billable_only=billable_only, billability=billability, tagging_scope=tagging_scope)
+    results = base_query.group_by(
         Resource.resource_group
     ).all()
 
@@ -176,6 +234,10 @@ def get_azure_resource_groups(
 def get_azure_resource_types(
     account_identifier: str = Path(...),
     resource_group: str = Path(...),
+    search: Optional[str] = Query(None),
+    billable_only: bool = Query(False),
+    billability: Optional[str] = Query(None),
+    tagging_scope: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -187,14 +249,19 @@ def get_azure_resource_types(
     if not account:
         raise HTTPException(status_code=404, detail="Azure account not found.")
 
-    results = db.query(
+    base_query = db.query(
         Resource.resource_type,
-        func.count(Resource.id).label("resource_count")
+        func.count(Resource.id).label("resource_count"),
+        func.max(Resource.billability).label("billability"),
+        func.max(Resource.tagging_scope).label("tagging_scope")
     ).filter(
         Resource.cloud_account_id == account.id,
         Resource.provider == CloudProvider.AZURE,
         Resource.resource_group == resource_group
-    ).group_by(
+    )
+    
+    base_query = apply_inventory_filters(base_query, search=search, billable_only=billable_only, billability=billability, tagging_scope=tagging_scope)
+    results = base_query.group_by(
         Resource.resource_type
     ).all()
 
@@ -206,7 +273,9 @@ def get_azure_resource_types(
         types.append(ResourceTypeCountSchema(
             resource_type=r.resource_type,
             display_name=display,
-            resource_count=r.resource_count
+            resource_count=r.resource_count,
+            billability=r.billability,
+            tagging_scope=r.tagging_scope
         ))
         
     return types
@@ -219,6 +288,10 @@ def get_azure_resources(
     account_identifier: str = Path(...),
     resource_group: str = Path(...),
     type: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    billable_only: bool = Query(False),
+    billability: Optional[str] = Query(None),
+    tagging_scope: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -236,8 +309,7 @@ def get_azure_resources(
         Resource.resource_group == resource_group
     )
     
-    if type:
-        query = query.filter(Resource.resource_type == type)
+    query = apply_inventory_filters(query, search=search, billable_only=billable_only, billability=billability, tagging_scope=tagging_scope, resource_type=type)
         
     resources = query.all()
     
@@ -263,6 +335,7 @@ def get_azure_resources(
             location=r.location,
             resource_id=r.resource_id,
             cloud_tags=r.cloud_tags,
+            billability=r.billability,
             tagging_scope=r.tagging_scope,
             status=status
         ))
@@ -272,6 +345,10 @@ def get_azure_resources(
 @router.get("/aws/accounts/{account_identifier}/regions", response_model=List[ResourceGroupCountSchema])
 def get_aws_regions(
     account_identifier: str = Path(...),
+    search: Optional[str] = Query(None),
+    billable_only: bool = Query(False),
+    billability: Optional[str] = Query(None),
+    tagging_scope: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -283,7 +360,7 @@ def get_aws_regions(
     if not account:
         raise HTTPException(status_code=404, detail="AWS account not found.")
 
-    results = db.query(
+    base_query = db.query(
         Resource.location,
         func.count(Resource.id).label("resource_count"),
         func.count(func.distinct(Resource.resource_type)).label("types_count")
@@ -291,7 +368,10 @@ def get_aws_regions(
         Resource.cloud_account_id == account.id,
         Resource.provider == CloudProvider.AWS,
         Resource.location != None
-    ).group_by(
+    )
+    
+    base_query = apply_inventory_filters(base_query, search=search, billable_only=billable_only, billability=billability, tagging_scope=tagging_scope)
+    results = base_query.group_by(
         Resource.location
     ).all()
 
@@ -310,6 +390,10 @@ def get_aws_regions(
 def get_aws_resource_types(
     account_identifier: str = Path(...),
     region: str = Path(...),
+    search: Optional[str] = Query(None),
+    billable_only: bool = Query(False),
+    billability: Optional[str] = Query(None),
+    tagging_scope: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -321,14 +405,19 @@ def get_aws_resource_types(
     if not account:
         raise HTTPException(status_code=404, detail="AWS account not found.")
 
-    results = db.query(
+    base_query = db.query(
         Resource.resource_type,
-        func.count(Resource.id).label("resource_count")
+        func.count(Resource.id).label("resource_count"),
+        func.max(Resource.billability).label("billability"),
+        func.max(Resource.tagging_scope).label("tagging_scope")
     ).filter(
         Resource.cloud_account_id == account.id,
         Resource.provider == CloudProvider.AWS,
         Resource.location == region
-    ).group_by(
+    )
+    
+    base_query = apply_inventory_filters(base_query, search=search, billable_only=billable_only, billability=billability, tagging_scope=tagging_scope)
+    results = base_query.group_by(
         Resource.resource_type
     ).all()
 
@@ -338,7 +427,9 @@ def get_aws_resource_types(
         types.append(ResourceTypeCountSchema(
             resource_type=r.resource_type,
             display_name=display,
-            resource_count=r.resource_count
+            resource_count=r.resource_count,
+            billability=r.billability,
+            tagging_scope=r.tagging_scope
         ))
         
     return types
@@ -348,6 +439,10 @@ def get_aws_resources(
     account_identifier: str = Path(...),
     region: str = Path(...),
     type: Optional[str] = Query(None),
+    search: Optional[str] = Query(None),
+    billable_only: bool = Query(False),
+    billability: Optional[str] = Query(None),
+    tagging_scope: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -365,8 +460,7 @@ def get_aws_resources(
         Resource.location == region
     )
     
-    if type:
-        query = query.filter(Resource.resource_type == type)
+    query = apply_inventory_filters(query, search=search, billable_only=billable_only, billability=billability, tagging_scope=tagging_scope, resource_type=type)
         
     resources = query.all()
     
@@ -389,6 +483,7 @@ def get_aws_resources(
             location=r.location,
             resource_id=r.resource_id,
             cloud_tags=r.cloud_tags,
+            billability=r.billability,
             tagging_scope=r.tagging_scope,
             status=status
         ))

@@ -114,7 +114,8 @@ def preview_bulk_tagging(
                 tag_key=k,
                 current_value=prev_value,
                 proposed_value=v,
-                will_change=will_change
+                will_change=will_change,
+                existing_tags=current_tags
             ))
             
     return PreviewResponseSchema(

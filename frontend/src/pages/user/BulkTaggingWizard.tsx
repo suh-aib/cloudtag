@@ -7,6 +7,27 @@ import { useAuth } from "../../contexts/AuthContext";
 import { getTagDefinitions, previewBulkTagging, createBulkTaggingProposal } from "../../services/api/tagging";
 import type { TagDefinition, ScopeType, PreviewResponse } from "../../services/api/tagging";
 
+const findSimilarKey = (target: string, existing: Record<string, string> | undefined) => {
+  if (!existing) return undefined;
+  const targetLower = target.toLowerCase();
+  const keys = Object.keys(existing);
+  for (const k of keys) {
+    const kLower = k.toLowerCase();
+    if (kLower !== targetLower) {
+      if (
+        (targetLower === 'environment' && (kLower === 'env' || kLower === 'environment')) ||
+        (targetLower === 'appname' && (kLower === 'name' || kLower === 'app' || kLower === 'application')) ||
+        (targetLower === 'businessunit' && (kLower === 'bu' || kLower === 'business' || kLower === 'dept')) ||
+        (kLower.length > 2 && targetLower.includes(kLower)) ||
+        (targetLower.length > 2 && kLower.includes(targetLower))
+      ) {
+        return k;
+      }
+    }
+  }
+  return undefined;
+};
+
 export default function BulkTaggingWizard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -38,9 +59,9 @@ export default function BulkTaggingWizard() {
     
     getToken().then(token => {
       if (token) {
-        getTagDefinitions(token).then(defs => {
-          // Filter by provider
-          const activeDefs = defs.filter(d => d.enabled && d.provider === provider);
+        getTagDefinitions(token, provider).then(defs => {
+          // The backend already correctly filters by provider (including SHARED)
+          const activeDefs = defs.filter(d => d.enabled);
           setTagDefs(activeDefs);
         }).catch(console.error);
       }
@@ -237,6 +258,7 @@ export default function BulkTaggingWizard() {
                     <thead className="bg-gray-50 sticky top-0 border-b z-10 shadow-sm">
                       <tr>
                         <th className="px-4 py-3 font-semibold text-gray-700">Resource Name</th>
+                        <th className="px-4 py-3 font-semibold text-gray-700">Existing Tags</th>
                         <th className="px-4 py-3 font-semibold text-gray-700">Tag</th>
                         <th className="px-4 py-3 font-semibold text-gray-700 text-center">Current Value</th>
                         <th className="px-4 py-3 font-semibold text-gray-700 text-center">Proposed Value</th>
@@ -248,10 +270,41 @@ export default function BulkTaggingWizard() {
                           <td className="px-4 py-2 font-medium text-gray-900 truncate max-w-[200px]" title={change.resource_name}>
                             {change.resource_name}
                           </td>
+                          <td className="px-4 py-2">
+                            {(!change.existing_tags || Object.keys(change.existing_tags).length === 0) ? (
+                              <span className="text-gray-400 italic text-xs">None</span>
+                            ) : (
+                              <div className="flex flex-wrap gap-1" title={Object.entries(change.existing_tags).map(([k,v]) => `${k}=${v}`).join('\n')}>
+                                {Object.entries(change.existing_tags).slice(0, 2).map(([k, v]) => (
+                                  <span key={k} className="px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded text-[10px] truncate max-w-[120px]">
+                                    {k}={v}
+                                  </span>
+                                ))}
+                                {Object.keys(change.existing_tags).length > 2 && (
+                                  <span className="px-1.5 py-0.5 bg-gray-100 text-gray-600 border border-gray-200 rounded text-[10px]">
+                                    +{Object.keys(change.existing_tags).length - 2}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                          </td>
                           <td className="px-4 py-2 text-gray-600 font-mono text-xs">{change.tag_key}</td>
                           <td className="px-4 py-2 text-center">
                             {change.current_value === 'ABSENT' ? (
-                              <span className="text-gray-400 italic text-xs">None</span>
+                              <div className="flex flex-col items-center">
+                                <span className="text-gray-400 italic text-xs font-medium">Not Set</span>
+                                {(() => {
+                                  const similar = findSimilarKey(change.tag_key, change.existing_tags);
+                                  if (similar) {
+                                    return (
+                                      <span className="text-[10px] text-amber-600 mt-1 cursor-help" title={`Similar existing key: ${similar}=${change.existing_tags![similar]}`}>
+                                        (Similar: {similar})
+                                      </span>
+                                    );
+                                  }
+                                  return null;
+                                })()}
+                              </div>
                             ) : (
                               <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs border">
                                 {change.current_value}

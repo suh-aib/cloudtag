@@ -67,6 +67,7 @@ class PreviewResourceChange(BaseModel):
     current_value: str
     proposed_value: str
     will_change: bool
+    existing_tags: Optional[Dict[str, str]] = None
 
 class PreviewResponseSchema(BaseModel):
     resource_count: int

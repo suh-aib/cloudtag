@@ -85,10 +85,8 @@ export default function TagConfiguration() {
 
     try {
       if (editingDef) {
-        // Technically backend doesn't support changing provider on update right now, but we can pass it if supported
-        // or just update other fields. We need to check if updateAdminTagDefinition supports provider.
-        // Assuming it does or will be ignored if not.
         await updateAdminTagDefinition(token, editingDef.id, {
+          provider: newProvider,
           description,
           mandatory,
           enabled
@@ -286,8 +284,8 @@ export default function TagConfiguration() {
                       id="applyAzure" 
                       checked={appliesToAzure} 
                       onChange={(e) => setAppliesToAzure(e.target.checked)}
-                      disabled={!!editingDef} // Disable changing provider for existing tags to prevent complexity
-                      className="h-4 w-4 text-azure border-gray-300 rounded focus:ring-azure disabled:opacity-50"
+                      disabled={false} // Allow changing provider
+                      className="h-4 w-4 text-azure border-gray-300 rounded focus:ring-azure"
                     />
                     <label htmlFor="applyAzure" className="text-sm text-gray-700">Azure</label>
                   </div>
@@ -297,8 +295,8 @@ export default function TagConfiguration() {
                       id="applyAws" 
                       checked={appliesToAws} 
                       onChange={(e) => setAppliesToAws(e.target.checked)}
-                      disabled={!!editingDef}
-                      className="h-4 w-4 text-aws border-gray-300 rounded focus:ring-aws disabled:opacity-50"
+                      disabled={false}
+                      className="h-4 w-4 text-aws border-gray-300 rounded focus:ring-aws"
                     />
                     <label htmlFor="applyAws" className="text-sm text-gray-700">AWS</label>
                   </div>

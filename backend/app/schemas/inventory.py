@@ -27,6 +27,8 @@ class ResourceTypeCountSchema(BaseModel):
     resource_type: str
     display_name: str
     resource_count: int
+    billability: Optional[str] = None
+    tagging_scope: Optional[str] = None
 
 class ResourceDetailSchema(BaseModel):
     id: int
@@ -36,6 +38,7 @@ class ResourceDetailSchema(BaseModel):
     location: Optional[str] = None
     resource_id: str
     cloud_tags: Optional[dict] = None
+    billability: str
     tagging_scope: str
     status: str # Derived from ResourceTagState or fallback to NOT_REVIEWED
 

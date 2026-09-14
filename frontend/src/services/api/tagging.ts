@@ -50,6 +50,7 @@ export interface PreviewResourceChange {
   current_value: string;
   proposed_value: string;
   will_change: boolean;
+  existing_tags?: Record<string, string>;
 }
 
 export interface PreviewResponse {
@@ -62,11 +63,13 @@ export interface BulkTagResponse {
   status: string;
 }
 
-export const getTagDefinitions = async (token: string): Promise<TagDefinition[]> => {
+export const getTagDefinitions = async (token: string, provider?: string): Promise<TagDefinition[]> => {
+  const params = provider ? { provider } : {};
   const response = await axios.get(`${API_BASE_URL}/api/tagging/definitions`, {
     headers: {
       Authorization: `Bearer ${token}`
-    }
+    },
+    params
   });
   return response.data;
 };

@@ -10,6 +10,12 @@ class TaggingScope(str, enum.Enum):
     SUPPORTING = "SUPPORTING"
     EXCLUDED = "EXCLUDED"
 
+class Billability(str, enum.Enum):
+    BILLABLE = "BILLABLE"
+    NON_BILLABLE = "NON_BILLABLE"
+    CONDITIONAL = "CONDITIONAL"
+    UNKNOWN = "UNKNOWN"
+
 class Resource(Base):
     __tablename__ = "resources"
 
@@ -25,6 +31,7 @@ class Resource(Base):
     resource_id_hash = Column(String(64), unique=True, nullable=False, index=True)
     resource_type = Column(String(255), nullable=False)
     location = Column(String(255), nullable=True)
+    billability = Column(Enum(Billability), default=Billability.UNKNOWN, nullable=False)
     tagging_scope = Column(Enum(TaggingScope), default=TaggingScope.REQUIRED, nullable=False)
     cloud_tags = Column(JSON, nullable=True) # Existing cloud tags
     discovered_at = Column(DateTime(timezone=True), server_default=func.now())

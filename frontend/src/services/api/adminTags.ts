@@ -25,7 +25,7 @@ export const createAdminTagDefinition = async (
 export const updateAdminTagDefinition = async (
   token: string, 
   id: number, 
-  data: { description?: string; mandatory?: boolean; enabled?: boolean }
+  data: { provider?: string; description?: string; mandatory?: boolean; enabled?: boolean }
 ): Promise<TagDefinition> => {
   const response = await axios.put(`${API_BASE_URL}/api/admin/tags/${id}`, data, {
     headers: { Authorization: `Bearer ${token}` }

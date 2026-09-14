@@ -26,6 +26,7 @@ class TagDefinitionCreate(BaseModel):
     enabled: bool = True
 
 class TagDefinitionUpdate(BaseModel):
+    provider: Optional[TagProvider] = None
     description: Optional[str] = None
     mandatory: Optional[bool] = None
     enabled: Optional[bool] = None
@@ -53,7 +54,13 @@ def get_tag_definitions(
 ):
     query = db.query(TagDefinition)
     if provider:
-        query = query.filter(TagDefinition.provider == provider)
+        from sqlalchemy import or_
+        query = query.filter(
+            or_(
+                TagDefinition.provider == provider,
+                TagDefinition.provider == TagProvider.SHARED
+            )
+        )
     return query.all()
 
 @router.post("", response_model=TagDefinitionSchema)

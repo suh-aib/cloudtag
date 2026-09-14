@@ -31,6 +31,8 @@ export interface ResourceTypeCount {
   resource_type: string;
   display_name: string;
   resource_count: number;
+  billability?: string;
+  tagging_scope?: string;
 }
 
 export interface ResourceDetail {
@@ -41,9 +43,41 @@ export interface ResourceDetail {
   location?: string;
   resource_id: string;
   cloud_tags?: Record<string, string>;
+  billability?: string;
   tagging_scope: string;
   status: string;
 }
+
+export interface InventoryFilters {
+  search?: string;
+  billable_only?: boolean;
+  billability?: string;
+  tagging_scope?: string;
+  resource_type?: string;
+  location?: string;
+}
+
+const buildQueryString = (filters?: InventoryFilters, additionalParams?: Record<string, string>) => {
+  const params = new URLSearchParams();
+  
+  if (filters) {
+    if (filters.search) params.append('search', filters.search);
+    if (filters.billable_only) params.append('billable_only', 'true');
+    if (filters.billability) params.append('billability', filters.billability);
+    if (filters.tagging_scope) params.append('tagging_scope', filters.tagging_scope);
+    if (filters.resource_type) params.append('resource_type', filters.resource_type);
+    if (filters.location) params.append('location', filters.location);
+  }
+  
+  if (additionalParams) {
+    Object.entries(additionalParams).forEach(([key, value]) => {
+      if (value) params.append(key, value);
+    });
+  }
+  
+  const queryString = params.toString();
+  return queryString ? `?${queryString}` : '';
+};
 
 export const getDashboardStats = async (token: string, provider?: string): Promise<DashboardStats> => {
   const url = provider 
@@ -55,58 +89,50 @@ export const getDashboardStats = async (token: string, provider?: string): Promi
   return response.data;
 };
 
-export const getProviderAccounts = async (token: string, provider: 'azure' | 'aws'): Promise<InventoryAccount[]> => {
-  const response = await axios.get(`${API_BASE_URL}/api/inventory/${provider}/accounts`, {
+export const getProviderAccounts = async (token: string, provider: 'azure' | 'aws', filters?: InventoryFilters): Promise<InventoryAccount[]> => {
+  const response = await axios.get(`${API_BASE_URL}/api/inventory/${provider}/accounts${buildQueryString(filters)}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   return response.data;
 };
 
-export const getAzureResourceGroups = async (token: string, accountId: string): Promise<ResourceGroupCount[]> => {
-  const response = await axios.get(`${API_BASE_URL}/api/inventory/azure/accounts/${encodeURIComponent(accountId)}/resource-groups`, {
+export const getAzureResourceGroups = async (token: string, accountId: string, filters?: InventoryFilters): Promise<ResourceGroupCount[]> => {
+  const response = await axios.get(`${API_BASE_URL}/api/inventory/azure/accounts/${encodeURIComponent(accountId)}/resource-groups${buildQueryString(filters)}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   return response.data;
 };
 
-export const getAzureResourceTypes = async (token: string, accountId: string, resourceGroup: string): Promise<ResourceTypeCount[]> => {
-  const response = await axios.get(`${API_BASE_URL}/api/inventory/azure/accounts/${encodeURIComponent(accountId)}/resource-groups/${encodeURIComponent(resourceGroup)}/types`, {
+export const getAzureResourceTypes = async (token: string, accountId: string, resourceGroup: string, filters?: InventoryFilters): Promise<ResourceTypeCount[]> => {
+  const response = await axios.get(`${API_BASE_URL}/api/inventory/azure/accounts/${encodeURIComponent(accountId)}/resource-groups/${encodeURIComponent(resourceGroup)}/types${buildQueryString(filters)}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   return response.data;
 };
 
-export const getAzureResources = async (token: string, accountId: string, resourceGroup: string, resourceType?: string): Promise<ResourceDetail[]> => {
-  let url = `${API_BASE_URL}/api/inventory/azure/accounts/${encodeURIComponent(accountId)}/resource-groups/${encodeURIComponent(resourceGroup)}/resources`;
-  if (resourceType) {
-    url += `?type=${encodeURIComponent(resourceType)}`;
-  }
-  const response = await axios.get(url, {
+export const getAzureResources = async (token: string, accountId: string, resourceGroup: string, resourceType?: string, filters?: InventoryFilters): Promise<ResourceDetail[]> => {
+  const response = await axios.get(`${API_BASE_URL}/api/inventory/azure/accounts/${encodeURIComponent(accountId)}/resource-groups/${encodeURIComponent(resourceGroup)}/resources${buildQueryString(filters, { type: resourceType || '' })}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   return response.data;
 };
 
-export const getAWSRegions = async (token: string, accountId: string): Promise<ResourceGroupCount[]> => {
-  const response = await axios.get(`${API_BASE_URL}/api/inventory/aws/accounts/${encodeURIComponent(accountId)}/regions`, {
+export const getAWSRegions = async (token: string, accountId: string, filters?: InventoryFilters): Promise<ResourceGroupCount[]> => {
+  const response = await axios.get(`${API_BASE_URL}/api/inventory/aws/accounts/${encodeURIComponent(accountId)}/regions${buildQueryString(filters)}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   return response.data;
 };
 
-export const getAWSResourceTypes = async (token: string, accountId: string, region: string): Promise<ResourceTypeCount[]> => {
-  const response = await axios.get(`${API_BASE_URL}/api/inventory/aws/accounts/${encodeURIComponent(accountId)}/regions/${encodeURIComponent(region)}/types`, {
+export const getAWSResourceTypes = async (token: string, accountId: string, region: string, filters?: InventoryFilters): Promise<ResourceTypeCount[]> => {
+  const response = await axios.get(`${API_BASE_URL}/api/inventory/aws/accounts/${encodeURIComponent(accountId)}/regions/${encodeURIComponent(region)}/types${buildQueryString(filters)}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   return response.data;
 };
 
-export const getAWSResources = async (token: string, accountId: string, region: string, resourceType?: string): Promise<ResourceDetail[]> => {
-  let url = `${API_BASE_URL}/api/inventory/aws/accounts/${encodeURIComponent(accountId)}/regions/${encodeURIComponent(region)}/resources`;
-  if (resourceType) {
-    url += `?type=${encodeURIComponent(resourceType)}`;
-  }
-  const response = await axios.get(url, {
+export const getAWSResources = async (token: string, accountId: string, region: string, resourceType?: string, filters?: InventoryFilters): Promise<ResourceDetail[]> => {
+  const response = await axios.get(`${API_BASE_URL}/api/inventory/aws/accounts/${encodeURIComponent(accountId)}/regions/${encodeURIComponent(region)}/resources${buildQueryString(filters, { type: resourceType || '' })}`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   return response.data;

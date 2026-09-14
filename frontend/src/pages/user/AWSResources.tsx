@@ -1,9 +1,11 @@
-import { Cloud, Search, Filter, ChevronRight, Server, Tags } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Cloud, ChevronRight, Server, Tags } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/Table";
-import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
-import { useState, useEffect } from "react";
+import { Badge } from "../../components/ui/Badge";
+import { InventoryFilters } from "../../components/ui/InventoryFilters";
+import type { InventoryFilters as APIFilters } from "../../services/api/inventory";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { getAWSResources, getProviderAccounts, type ResourceDetail } from "../../services/api/inventory";
@@ -16,6 +18,7 @@ export default function AWSResources() {
   const [resources, setResources] = useState<ResourceDetail[]>([]);
   const [accountName, setAccountName] = useState<string>(accountId || '');
   const [isLoading, setIsLoading] = useState(true);
+  const [filters, setFilters] = useState<APIFilters>({});
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
@@ -25,8 +28,8 @@ export default function AWSResources() {
     getToken().then(token => {
       if (token) {
         Promise.all([
-          getAWSResources(token, accountId, region, resourceType),
-          getProviderAccounts(token, 'aws')
+          getAWSResources(token, accountId, region, resourceType, filters),
+          getProviderAccounts(token, 'aws', filters)
         ])
           .then(([data, accountsData]) => {
             setResources(data);
@@ -41,7 +44,7 @@ export default function AWSResources() {
         setIsLoading(false);
       }
     });
-  }, [getToken, accountId, region, resourceType]);
+  }, [getToken, accountId, region, resourceType, filters]);
 
   const displayType = resourceType ? (resourceType.split('/').pop() || resourceType) : '';
 
@@ -102,17 +105,12 @@ export default function AWSResources() {
 
       <Card className="shadow-sm border-gray-200">
         <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between gap-4">
-          <div className="flex gap-4 flex-1">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <Input
-                placeholder="Search resources..."
-                className="pl-10 bg-gray-50/50"
-              />
-            </div>
-            <Button variant="outline" className="gap-2 text-gray-600">
-              <Filter size={16} /> Filter
-            </Button>
+          <div className="flex-1">
+            <InventoryFilters 
+              onFiltersChange={setFilters} 
+              showLocationFilter={false}
+              showResourceTypeFilter={true}
+            />
           </div>
           
           {selectedIds.size > 0 && (
@@ -123,7 +121,7 @@ export default function AWSResources() {
               <Button variant="ghost" size="sm" onClick={clearSelection} className="h-8 text-gray-500 hover:text-gray-900">
                 Clear
               </Button>
-              <Button size="sm" className="h-8 gap-2 bg-aws hover:bg-aws-dark" onClick={() => navigate(`/bulk-tagging/wizard?provider=AZURE&scopeType=RESOURCE_SELECTION&resourceIds=${Array.from(selectedIds).join(',')}`)}>
+              <Button size="sm" className="h-8 gap-2 bg-aws hover:bg-aws-dark" onClick={() => navigate(`/bulk-tagging/wizard?provider=AWS&scopeType=RESOURCE_SELECTION&resourceIds=${Array.from(selectedIds).join(',')}`)}>
                 <Tags size={16} /> Bulk Tag
               </Button>
             </div>
@@ -148,9 +146,10 @@ export default function AWSResources() {
                       disabled={isLoading || resources.length === 0}
                     />
                   </TableHead>
-                  <TableHead className="font-semibold text-gray-700 w-1/4">Resource Name</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Location</TableHead>
-                  <TableHead className="font-semibold text-gray-700">Tagging Scope</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Resource Name</TableHead>
+                  <TableHead className="font-semibold text-gray-700">Resource ID</TableHead>
+                  <TableHead className="font-semibold text-gray-700 text-center">Billable</TableHead>
+                  <TableHead className="font-semibold text-gray-700 text-center">Tagging Scope</TableHead>
                   <TableHead className="font-semibold text-gray-700">Status</TableHead>
                   <TableHead className="w-10"></TableHead>
                 </TableRow>
@@ -158,13 +157,13 @@ export default function AWSResources() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-16 text-center text-gray-500">
+                    <TableCell colSpan={7} className="py-16 text-center text-gray-500">
                       Loading resources...
                     </TableCell>
                   </TableRow>
                 ) : resources.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="py-16 text-center">
+                    <TableCell colSpan={7} className="py-16 text-center">
                       <div className="flex flex-col items-center justify-center text-gray-400 space-y-3">
                         <Server size={48} className="text-aws/40" />
                         <p className="text-sm font-medium text-gray-600">No resources available</p>
@@ -186,12 +185,20 @@ export default function AWSResources() {
                         <div className="font-medium text-gray-900 truncate max-w-sm" title={res.resource_name}>
                           {res.resource_name}
                         </div>
-                        <div className="text-xs text-gray-400 font-mono truncate max-w-sm mt-0.5" title={res.resource_id}>
-                          {res.resource_id.split('/').pop()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-xs text-gray-400 font-mono truncate max-w-sm" title={res.resource_id}>
+                          {res.resource_id.split('/').pop() || res.resource_id}
                         </div>
                       </TableCell>
-                      <TableCell className="text-gray-500 text-sm">{res.location || 'N/A'}</TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
+                        {res.billability && (
+                          <Badge variant={res.billability === 'BILLABLE' ? 'success' : res.billability === 'NON_BILLABLE' ? 'secondary' : 'warning'}>
+                            {res.billability}
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-center">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
                           res.tagging_scope === 'REQUIRED' ? 'bg-amber-100 text-amber-800' :
                           res.tagging_scope === 'SUPPORTING' ? 'bg-blue-100 text-blue-800' :
@@ -211,7 +218,7 @@ export default function AWSResources() {
                           size="sm" 
                           className="h-8 text-aws hover:bg-aws-light"
                           onClick={() => {
-                            navigate(`/bulk-tagging/wizard?provider=AZURE&scopeType=RESOURCE_SELECTION&resourceIds=${res.id}`);
+                            navigate(`/bulk-tagging/wizard?provider=AWS&scopeType=RESOURCE_SELECTION&resourceIds=${res.id}`);
                           }}
                         >
                           Tag
