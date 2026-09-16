@@ -34,13 +34,12 @@ def override_get_db():
 def override_get_current_user():
     return User(id=1, email="testadmin@example.com")
 
-fastapi_app.dependency_overrides[get_db] = override_get_db
-fastapi_app.dependency_overrides[get_current_user] = override_get_current_user
-
 client = TestClient(fastapi_app)
 
 @pytest.fixture(autouse=True)
 def test_db():
+    fastapi_app.dependency_overrides[get_db] = override_get_db
+    fastapi_app.dependency_overrides[get_current_user] = override_get_current_user
     Base.metadata.create_all(bind=engine)
     db = TestingSessionLocal()
     
@@ -64,6 +63,8 @@ def test_db():
     
     db.close()
     Base.metadata.drop_all(bind=engine)
+    fastapi_app.dependency_overrides.pop(get_db, None)
+    fastapi_app.dependency_overrides.pop(get_current_user, None)
 
 def test_dashboard_stats(test_db):
     response = client.get("/api/inventory/dashboard/stats")

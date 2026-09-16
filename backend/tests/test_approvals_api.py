@@ -15,9 +15,6 @@ def mock_admin_user():
 def mock_normal_user():
     return User(id=2, email="user@test.com", display_name="Test User", role="USER")
 
-fastapi_app.dependency_overrides[get_current_user] = mock_normal_user
-fastapi_app.dependency_overrides[get_admin_user] = mock_admin_user
-
 @pytest.fixture
 def test_db(monkeypatch):
     from sqlalchemy import create_engine
@@ -38,6 +35,9 @@ def test_db(monkeypatch):
     TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
     
     db = TestingSessionLocal()
+    
+    fastapi_app.dependency_overrides[get_current_user] = mock_normal_user
+    fastapi_app.dependency_overrides[get_admin_user] = mock_admin_user
     
     # Insert users
     admin = User(id=1, email="admin@test.com", display_name="Admin User", role="ADMIN", password_hash="pw")
@@ -62,6 +62,8 @@ def test_db(monkeypatch):
     yield db
     Base.metadata.drop_all(bind=engine)
     fastapi_app.dependency_overrides.pop(get_db, None)
+    fastapi_app.dependency_overrides.pop(get_current_user, None)
+    fastapi_app.dependency_overrides.pop(get_admin_user, None)
 
 def test_get_approval_queue_admin(test_db):
     response = client.get("/api/approvals/queue")

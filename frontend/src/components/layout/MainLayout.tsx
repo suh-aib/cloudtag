@@ -1,6 +1,7 @@
 import { Outlet } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Header } from "./Header";
+import { TaskContextBanner } from "./TaskContextBanner";
 
 export function MainLayout() {
   return (
@@ -8,6 +9,7 @@ export function MainLayout() {
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
+        <TaskContextBanner />
         <main className="flex-1 overflow-y-auto p-6">
           <Outlet />
         </main>

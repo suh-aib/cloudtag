@@ -14,9 +14,14 @@ import {
   Database,
   FileSpreadsheet,
   Activity,
-  History,
-  Server
+  Server,
+  UserPlus,
+  List,
+  ChevronDown,
+  ChevronRight,
+  ClipboardList
 } from "lucide-react";
+import { useState } from "react";
 
 export function Sidebar() {
   const { user } = useAuth();
@@ -43,6 +48,34 @@ export function Sidebar() {
     </Link>
   );
 
+  const NavGroup = ({ icon: Icon, label, children, paths }: { icon: any, label: string, children: React.ReactNode, paths: string[] }) => {
+    const isGroupActive = paths.some(p => isActive(p));
+    const [isOpen, setIsOpen] = useState(isGroupActive);
+
+    return (
+      <div className="mb-1">
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className={cn(
+            "w-full flex items-center justify-between px-3 py-2.5 rounded-md text-sm font-medium transition-colors",
+            isGroupActive && !isOpen ? "text-white bg-navy-800/50" : "text-slate-300 hover:bg-navy-800 hover:text-white"
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <Icon size={18} className={isGroupActive ? "text-white" : "text-slate-400"} />
+            {label}
+          </div>
+          {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        </button>
+        {isOpen && (
+          <div className="mt-1 ml-4 pl-3 border-l border-navy-800 space-y-1">
+            {children}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <aside className="w-64 bg-navy-950 text-white border-r border-navy-800 min-h-screen flex flex-col z-10 shadow-xl">
       <div className="h-[72px] flex items-center px-5 border-b border-navy-800 bg-navy-900/50">
@@ -64,26 +97,30 @@ export function Sidebar() {
           <NavItem to="/azure" icon={Cloud} label="Azure Resources" customActiveColor="bg-azure/20 text-azure-light border border-azure/30" />
           <NavItem to="/aws" icon={Server} label="AWS Resources" customActiveColor="bg-aws/20 text-aws-light border border-aws/30" />
           <NavItem to="/bulk-tagging" icon={Tag} label="Bulk Tagging" customActiveColor="bg-purple-500/20 text-purple-300 border border-purple-500/30" />
-          <NavItem to="/my-tagging" icon={Tag} label="My Tagging" />
+          <NavItem to="/my-tasks" icon={Tag} label="My Tasks" />
+          <NavItem to="/my-tagging-progress" icon={Activity} label="My Tagging Progress" />
           <NavItem to="/saved-tags" icon={Save} label="Saved Tags" />
           <NavItem to="/my-submissions" icon={Clock} label="My Submissions" />
           <NavItem to="/approved" icon={CheckCircle} label="Approved" />
-          <NavItem to="/jobs" icon={Terminal} label="Jobs" />
 
           {user?.role === "ADMIN" && (
             <>
               <div className="text-[11px] font-bold text-slate-500 uppercase tracking-widest mb-3 mt-8 px-3">Admin</div>
-              <NavItem to="/admin" icon={Activity} label="Overview" />
-              <NavItem to="/admin/users-roles" icon={Users} label="Users & Roles" />
-              <NavItem to="/admin/cloud-configuration" icon={Settings} label="Cloud Configuration" />
-              <NavItem to="/admin/data-sources" icon={Database} label="Data Sources" />
-              <NavItem to="/admin/tag-configuration" icon={FileSpreadsheet} label="Tag Configuration" />
-              <NavItem to="/admin/tag-values" icon={Tag} label="Tag Values" />
-              <NavItem to="/admin/approvals" icon={Clock} label="Approval Queue" />
-              <NavItem to="/admin/approved-work" icon={CheckCircle} label="Approved Work" />
-              <NavItem to="/admin/tagging-progress" icon={Activity} label="Tagging Progress" />
+              <NavGroup 
+                icon={ClipboardList} 
+                label="User Tasks" 
+                paths={["/admin/user-tasks/assign", "/admin/user-tasks/assigned", "/admin/user-tasks/progress"]}
+              >
+                <NavItem to="/admin/user-tasks/assign" icon={UserPlus} label="Assign Task" />
+                <NavItem to="/admin/user-tasks/assigned" icon={List} label="Assigned Tasks" />
+                <NavItem to="/admin/user-tasks/progress" icon={Activity} label="Task Progress" />
+              </NavGroup>
               <NavItem to="/admin/script-generation" icon={Terminal} label="Script Jobs" />
-              <NavItem to="/admin/audit-logs" icon={History} label="Audit Logs" />
+              <NavItem to="/admin/tagging-approvals" icon={CheckCircle} label="Tagging Approvals" />
+              <NavItem to="/admin/tag-configuration" icon={FileSpreadsheet} label="Tag Configuration" />
+              <NavItem to="/admin/data-sources" icon={Database} label="Data Sources" />
+              <NavItem to="/admin/cloud-configuration" icon={Settings} label="Cloud Configuration" />
+              <NavItem to="/admin/users-roles" icon={Users} label="Users & Roles" />
             </>
           )}
         </nav>

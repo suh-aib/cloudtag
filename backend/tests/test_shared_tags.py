@@ -12,20 +12,16 @@ from app.models.user import UserRole
 
 client = TestClient(app)
 
-# Override admin user auth for tests
-def override_get_current_user():
+def override_get_admin_user():
     from app.models.user import User
     return User(id=999, email="admin@test.com", role=UserRole.ADMIN)
 
-# Mocking `get_current_user` in the app:
-from app.api.deps import get_current_user
-app.dependency_overrides[get_current_user] = override_get_current_user
-
 @pytest.fixture(autouse=True)
 def run_around_tests():
-    # Setup - we'll just let the regular DB be used, but we'll clean up our test tags
+    from app.api.admin_tags import get_admin_user as admin_tags_get_admin_user
+    app.dependency_overrides[admin_tags_get_admin_user] = override_get_admin_user
     yield
-    # Cleanup code here if needed
+    app.dependency_overrides.pop(admin_tags_get_admin_user, None)
 
 def test_1_create_azure_only_tag():
     response = client.post("/api/admin/tags", json={"provider": "AZURE", "name": "TEST_AZURE_ONLY", "enabled": True})

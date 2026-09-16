@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { MainLayout } from "./components/layout/MainLayout";
 import { AuthProvider } from "./contexts/AuthContext";
 import { RequireAuth, RequireAdmin } from "./components/layout/ProtectedRoute";
@@ -13,29 +13,31 @@ import AWS from "./pages/user/AWS";
 import AWSRegions from "./pages/user/AWSRegions";
 import AWSTypes from "./pages/user/AWSTypes";
 import AWSResources from "./pages/user/AWSResources";
-import MyTagging from "./pages/user/MyTagging";
+import MyTasks from "./pages/user/MyTasks";
+import TaskDetail from "./pages/user/TaskDetail";
 import SavedTags from "./pages/user/SavedTags";
 import MySubmissions from "./pages/user/MySubmissions";
 import SubmissionDetails from "./pages/user/SubmissionDetails";
 import ApprovedWork from "./pages/user/ApprovedWork";
 import BulkTaggingHome from "./pages/user/BulkTaggingHome";
 import BulkTaggingWizard from "./pages/user/BulkTaggingWizard";
-import Jobs from "./pages/user/Jobs";
 
-import AdminOverview from "./pages/admin/AdminOverview";
+import MyTaggingProgress from "./pages/user/MyTaggingProgress";
+
 import UsersRoles from "./pages/admin/UsersRoles";
 import CloudConfiguration from "./pages/admin/CloudConfiguration";
 import DataSources from "./pages/admin/DataSources";
 import TagConfiguration from "./pages/admin/TagConfiguration";
-import TagValues from "./pages/admin/TagValues";
 import AdminSavedTags from "./pages/admin/AdminSavedTags";
 import AssignedTags from "./pages/admin/AssignedTags";
-import TaggingProgress from "./pages/admin/TaggingProgress";
 import ScriptGeneration from "./pages/admin/ScriptGeneration";
 import AuditLogs from "./pages/admin/AuditLogs";
 import ApprovalWorkspace from "./pages/admin/ApprovalWorkspace";
-import ApprovalQueue from "./pages/admin/ApprovalQueue";
-import AdminApprovedWork from "./pages/admin/AdminApprovedWork";
+import TaggingApprovals from "./pages/admin/TaggingApprovals";
+import UserTagProgress from "./pages/admin/UserTagProgress";
+import AdminUserDetail from "./pages/admin/AdminUserDetail";
+import AssignTask from "./pages/admin/AssignTask";
+import AssignedTasks from "./pages/admin/AssignedTasks";
 
 import NotFound from "./pages/common/NotFound";
 
@@ -58,31 +60,47 @@ function App() {
               <Route path="aws/:accountId" element={<AWSRegions />} />
               <Route path="aws/:accountId/:region" element={<AWSTypes />} />
               <Route path="aws/:accountId/:region/:resourceType" element={<AWSResources />} />
-              <Route path="my-tagging" element={<MyTagging />} />
+              <Route path="my-tasks" element={<MyTasks />} />
+              <Route path="my-tasks/:provider/:taskId" element={<TaskDetail />} />
+              <Route path="my-tagging" element={<Navigate to="/my-tasks" replace />} />
               <Route path="saved-tags" element={<SavedTags />} />
               <Route path="my-submissions" element={<MySubmissions />} />
               <Route path="my-submissions/:batchId" element={<SubmissionDetails />} />
               <Route path="approved" element={<ApprovedWork />} />
               <Route path="bulk-tagging" element={<BulkTaggingHome />} />
               <Route path="bulk-tagging/wizard" element={<BulkTaggingWizard />} />
-              <Route path="jobs" element={<Jobs />} />
+
+              <Route path="my-tagging-progress" element={<MyTaggingProgress />} />
 
               {/* Admin Routes */}
               <Route path="admin" element={<RequireAdmin />}>
-                <Route index element={<AdminOverview />} />
+                <Route index element={<Navigate to="/" replace />} />
                 <Route path="users-roles" element={<UsersRoles />} />
                 <Route path="cloud-configuration" element={<CloudConfiguration />} />
                 <Route path="data-sources" element={<DataSources />} />
                 <Route path="tag-configuration" element={<TagConfiguration />} />
-                <Route path="tag-values" element={<TagValues />} />
+                
+                {/* Legacy Redirects */}
+                <Route path="tag-values" element={<Navigate to="/admin/tag-configuration" replace />} />
+                <Route path="approvals" element={<Navigate to="/admin/tagging-approvals" replace />} />
+                <Route path="approved-work" element={<Navigate to="/admin/tagging-approvals?tab=approved" replace />} />
+                <Route path="tagging-progress" element={<Navigate to="/my-tagging-progress" replace />} />
+                <Route path="user-tag-progress" element={<Navigate to="/admin/user-tasks/progress" replace />} />
+                <Route path="user-tag-progress/:userId" element={<Navigate to="/admin/user-tasks/progress/:userId" replace />} />
+
+                <Route path="tagging-approvals" element={<TaggingApprovals />} />
+                <Route path="tagging-approvals/:batchId" element={<ApprovalWorkspace />} />
+                
+                <Route path="user-tasks/assign" element={<AssignTask />} />
+                <Route path="user-tasks/assigned" element={<AssignedTasks />} />
+                <Route path="user-tasks/progress" element={<UserTagProgress />} />
+                <Route path="user-tasks/progress/:userId" element={<AdminUserDetail />} />
+                <Route path="user-tasks/progress/:userId/task/:provider/:taskId" element={<TaskDetail adminMode={true} />} />
+
                 <Route path="saved-tags" element={<AdminSavedTags />} />
                 <Route path="assigned-tags" element={<AssignedTags />} />
-                <Route path="tagging-progress" element={<TaggingProgress />} />
                 <Route path="script-generation" element={<ScriptGeneration />} />
                 <Route path="audit-logs" element={<AuditLogs />} />
-                <Route path="approvals" element={<ApprovalQueue />} />
-                <Route path="approvals/:batchId" element={<ApprovalWorkspace />} />
-                <Route path="approved-work" element={<AdminApprovedWork />} />
               </Route>
 
               <Route path="*" element={<NotFound />} />

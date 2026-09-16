@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { Cloud, Server, ArrowRight, Tag } from "lucide-react";
+import { Cloud, Server, ArrowRight, Tag, UserPlus } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { useAuth } from "../../contexts/AuthContext";
@@ -9,7 +9,7 @@ import type { InventoryAccount, ResourceGroupCount, ResourceTypeCount } from "..
 
 export default function BulkTaggingHome() {
   const navigate = useNavigate();
-  const { getToken } = useAuth();
+  const { getToken, user } = useAuth();
   
   const [provider, setProvider] = useState<'AZURE' | 'AWS' | null>(null);
   const [scopeType, setScopeType] = useState<string>("");
@@ -23,6 +23,8 @@ export default function BulkTaggingHome() {
   const [selectedAccountId, setSelectedAccountId] = useState("");
   const [selectedResourceGroup, setSelectedResourceGroup] = useState("");
   const [selectedResourceType, setSelectedResourceType] = useState("");
+
+
 
   useEffect(() => {
     if (provider) {
@@ -83,6 +85,23 @@ export default function BulkTaggingHome() {
     if (selectedResourceType) params.set('resourceType', selectedResourceType);
     
     navigate(`/bulk-tagging/wizard?${params.toString()}`);
+  };
+
+  const handleOpenAssign = () => {
+    if (!canContinue() || !provider || !scopeType) return;
+    
+    let assignmentScopeType = scopeType === "AWS_ACCOUNT" ? "ACCOUNT" : scopeType;
+    let url = `/admin/user-tasks/assign?provider=${provider}&scope_type=${assignmentScopeType}`;
+    
+    if (provider === 'AZURE') {
+        if (selectedAccountId) url += `&subscription_id=${encodeURIComponent(selectedAccountId)}`;
+        if (selectedResourceGroup) url += `&resource_group=${encodeURIComponent(selectedResourceGroup)}`;
+        if (selectedResourceType) url += `&resource_type=${encodeURIComponent(selectedResourceType)}`;
+    } else {
+        if (selectedAccountId) url += `&account_id=${encodeURIComponent(selectedAccountId)}`;
+    }
+    
+    navigate(url);
   };
 
   return (
@@ -229,7 +248,17 @@ export default function BulkTaggingHome() {
         )}
       </div>
 
-      <div className="flex justify-end pt-4">
+      <div className="flex justify-end pt-4 gap-4">
+        {user?.role === "ADMIN" && provider && canContinue() && (
+          <Button 
+            size="lg"
+            variant="outline"
+            className="border-gray-300 text-gray-700 bg-white hover:bg-gray-50 gap-2 font-medium" 
+            onClick={handleOpenAssign}
+          >
+            <UserPlus size={18} className={provider === 'AZURE' ? 'text-azure' : 'text-aws'} /> Assign Task
+          </Button>
+        )}
         <Button 
           size="lg"
           className="bg-purple-600 hover:bg-purple-700 text-white gap-2 font-medium" 
@@ -239,6 +268,7 @@ export default function BulkTaggingHome() {
           Continue to Tagging <ArrowRight size={18} />
         </Button>
       </div>
+
     </div>
   );
 }

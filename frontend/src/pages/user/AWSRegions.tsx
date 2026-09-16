@@ -5,9 +5,12 @@ import { Button } from "../../components/ui/Button";
 import { InventoryFilters } from "../../components/ui/InventoryFilters";
 import type { InventoryFilters as APIFilters } from "../../services/api/inventory";
 import { useState, useEffect } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { getAWSRegions, getProviderAccounts, type ResourceGroupCount } from "../../services/api/inventory";
+import { TaskAssignmentBanner } from "../../components/tagging/TaskAssignmentBanner";
+import { ConfirmAssignmentModal } from "../../components/tagging/ConfirmAssignmentModal";
+import type { CreateAssignmentPayload } from "../../types/assignment";
 
 
 const AWS_REGION_NAMES: Record<string, string> = {
@@ -40,11 +43,26 @@ const getRegionDisplayName = (region: string) => {
 export default function AWSRegions() {
   const { accountId } = useParams<{ accountId: string }>();
   const navigate = useNavigate();
-  const { getToken } = useAuth();
+  const [searchParams] = useSearchParams();
+  const assignUserId = searchParams.get("assign_user_id");
+  const taskId = searchParams.get("task_id");
+
+  const { getToken, user } = useAuth();
   const [regions, setRegions] = useState<ResourceGroupCount[]>([]);
   const [accountName, setAccountName] = useState<string>(accountId || '');
   const [isLoading, setIsLoading] = useState(true);
-  const [filters, setFilters] = useState<APIFilters>({});
+  const [filters, setFilters] = useState<APIFilters>({ ...(taskId ? { task_id: parseInt(taskId, 10) } : {}) });
+
+  const [assignPayload, setAssignPayload] = useState<CreateAssignmentPayload | null>(null);
+
+  const getQueryString = () => {
+    const p = new URLSearchParams();
+    if (assignUserId) p.append("assign_user_id", assignUserId);
+    if (taskId) p.append("task_id", taskId);
+    const s = p.toString();
+    return s ? `?${s}` : "";
+  };
+
 
   useEffect(() => {
     if (!accountId) return;
@@ -75,9 +93,10 @@ export default function AWSRegions() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto py-2">
+      <TaskAssignmentBanner />
       {/* Breadcrumbs */}
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-        <Link to="/aws" className="hover:text-aws transition-colors flex items-center gap-1">
+        <Link to={`/aws${getQueryString()}`} className="hover:text-aws transition-colors flex items-center gap-1">
           <Cloud size={14} />
           AWS
         </Link>
@@ -152,11 +171,24 @@ export default function AWSRegions() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right space-x-2">
-                      <Button variant="outline" size="sm" className="h-8 border-purple-200 text-purple-700 hover:bg-purple-50" onClick={() => navigate(`/bulk-tagging/wizard?provider=AWS&scopeType=REGION&accountId=${encodeURIComponent(accountId || '')}&region=${encodeURIComponent(regionObj.name)}`)}>
-                        Bulk Tag
-                      </Button>
+                      {user?.role === "ADMIN" && assignUserId && (
+                        <Button variant="outline" size="sm" className="h-8 border-aws-200 text-aws hover:bg-aws-50" onClick={() => setAssignPayload({
+                          provider: "AWS",
+                          scope_type: "REGION",
+                          account_id: accountId || '',
+                          region_id: regionObj.name,
+                          assigned_user_id: parseInt(assignUserId)
+                        })}>
+                          Assign Task
+                        </Button>
+                      )}
+                      {!assignUserId && (
+                        <Button variant="outline" size="sm" className="h-8 border-purple-200 text-purple-700 hover:bg-purple-50" onClick={() => navigate(`/bulk-tagging/wizard?provider=AWS&scopeType=REGION&accountId=${encodeURIComponent(accountId || '')}&region=${encodeURIComponent(regionObj.name)}${taskId ? `&task_id=${taskId}` : ''}`)}>
+                          Bulk Tag
+                        </Button>
+                      )}
                       <Button variant="ghost" size="sm" className="h-8 text-aws hover:bg-aws-light" asChild>
-                        <Link to={`/aws/${encodeURIComponent(accountId || '')}/${encodeURIComponent(regionObj.name)}`}>
+                        <Link to={`/aws/${encodeURIComponent(accountId || '')}/${encodeURIComponent(regionObj.name)}${getQueryString()}`}>
                           View
                         </Link>
                       </Button>
@@ -168,6 +200,15 @@ export default function AWSRegions() {
           </Table>
         </CardContent>
       </Card>
+
+      {assignPayload && assignUserId && (
+        <ConfirmAssignmentModal
+          isOpen={!!assignPayload}
+          onClose={() => setAssignPayload(null)}
+          assignUserId={assignUserId}
+          payload={assignPayload}
+        />
+      )}
     </div>
   );
 }

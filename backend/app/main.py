@@ -3,7 +3,11 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
-from app.api import health, auth, admin_users, cloud, sharepoint, csv_upload, inventory, tagging, admin_tags, approvals
+from app.api import (
+    health, auth, admin_users, cloud, sharepoint, csv_upload,
+    inventory, tagging, admin_tags, approvals, scripts,
+    admin_assignments, my_assignments
+)
 
 # Setup basic logging
 logging.basicConfig(level=logging.INFO)
@@ -42,11 +46,14 @@ app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(admin_users.router, prefix="/api/admin/users", tags=["admin-users"])
 app.include_router(admin_tags.router, prefix="/api/admin/tags", tags=["admin-tags"])
 app.include_router(cloud.router, prefix="/api/admin/cloud", tags=["admin-cloud"])
-app.include_router(sharepoint.router, prefix="/api/admin/sharepoint", tags=["admin-sharepoint"])
-app.include_router(csv_upload.router, prefix="/api/admin/csv", tags=["admin-csv"])
+app.include_router(sharepoint.router, prefix="/api/admin/sharepoint", tags=["sharepoint"])
+app.include_router(csv_upload.router, prefix="/api/admin/csv-upload", tags=["csv_upload"])
+app.include_router(admin_assignments.router, prefix="/api/admin", tags=["admin_assignments"])
+app.include_router(my_assignments.router, prefix="/api/my", tags=["my_assignments"])
 app.include_router(inventory.router, prefix="/api/inventory", tags=["inventory"])
 app.include_router(tagging.router, prefix="/api/tagging", tags=["tagging"])
 app.include_router(approvals.router, prefix="/api/approvals", tags=["approvals"])
+app.include_router(scripts.router, prefix="/api/admin/scripts", tags=["admin-scripts"])
 
 @app.on_event("startup")
 async def startup_event():

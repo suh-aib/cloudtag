@@ -6,6 +6,7 @@ from app.models.tagging import TaggingBatch, TaggingChange, Approval, ScriptJob,
 from app.models.audit import AuditLog
 from app.models.sharepoint import SharePointConfig, SharePointSyncJob, SharePointMapping
 from app.models.csv_upload import CSVUploadJob
+from app.models.assignment import TaskAssignment, TaskAssignmentResource
 
 __all__ = [
     "User",
@@ -26,5 +27,7 @@ __all__ = [
     "SharePointConfig",
     "SharePointSyncJob",
     "SharePointMapping",
-    "CSVUploadJob"
+    "CSVUploadJob",
+    "TaskAssignment",
+    "TaskAssignmentResource"
 ]

@@ -29,6 +29,7 @@ export interface BulkTagRequest {
   resource_type?: string;
   resource_ids?: number[];
   tags: Record<string, string>;
+  task_id?: number;
   status?: string;
 }
 

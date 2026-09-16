@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models.user import User
 from app.models.cloud import CloudProvider, CloudAccount
 from app.models.resource import Resource, TaggingScope, Billability
+from app.models.assignment import TaskAssignment, TaskAssignmentResource, TaskAssignmentStatus
 from app.api.deps import get_current_user
 from app.schemas.inventory import (
     DashboardStatsSchema, InventoryAccountSchema,
@@ -43,6 +44,25 @@ def apply_inventory_filters(query, search=None, billable_only=False, billability
             )
         )
     return query
+
+
+def apply_task_filter(query, db: Session, task_id: int, current_user: User, provider: CloudProvider):
+    task = db.query(TaskAssignment).filter(TaskAssignment.id == task_id).first()
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found.")
+    if task.assigned_user_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Unauthorized access to task resources.")
+    if task.status != TaskAssignmentStatus.ACTIVE:
+        raise HTTPException(status_code=400, detail="Task is not active.")
+    if task.provider != provider:
+        raise HTTPException(status_code=400, detail="Provider mismatch for this task.")
+        
+    return query.join(
+        TaskAssignmentResource,
+        TaskAssignmentResource.resource_id == Resource.id
+    ).filter(
+        TaskAssignmentResource.assignment_id == task_id
+    )
 
 def apply_account_search(query, search=None):
     if search:
@@ -138,6 +158,7 @@ def get_provider_accounts(
     billable_only: bool = Query(False),
     billability: Optional[str] = Query(None),
     tagging_scope: Optional[str] = Query(None),
+    task_id: Optional[int] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -162,6 +183,8 @@ def get_provider_accounts(
     
     # Apply Resource filters to ensure counts are accurate
     base_query = apply_inventory_filters(base_query, search=None, billable_only=billable_only, billability=billability, tagging_scope=tagging_scope)
+    if task_id:
+        base_query = apply_task_filter(base_query, db, task_id, current_user, provider_enum)
     # Apply Account search
     base_query = apply_account_search(base_query, search=search)
     
@@ -189,6 +212,7 @@ def get_azure_resource_groups(
     billable_only: bool = Query(False),
     billability: Optional[str] = Query(None),
     tagging_scope: Optional[str] = Query(None),
+    task_id: Optional[int] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -213,6 +237,8 @@ def get_azure_resource_groups(
     )
     
     base_query = apply_inventory_filters(base_query, search=search, billable_only=billable_only, billability=billability, tagging_scope=tagging_scope)
+    if task_id:
+        base_query = apply_task_filter(base_query, db, task_id, current_user, CloudProvider.AZURE)
     results = base_query.group_by(
         Resource.resource_group
     ).all()
@@ -238,6 +264,7 @@ def get_azure_resource_types(
     billable_only: bool = Query(False),
     billability: Optional[str] = Query(None),
     tagging_scope: Optional[str] = Query(None),
+    task_id: Optional[int] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -261,6 +288,8 @@ def get_azure_resource_types(
     )
     
     base_query = apply_inventory_filters(base_query, search=search, billable_only=billable_only, billability=billability, tagging_scope=tagging_scope)
+    if task_id:
+        base_query = apply_task_filter(base_query, db, task_id, current_user, CloudProvider.AZURE)
     results = base_query.group_by(
         Resource.resource_type
     ).all()
@@ -292,6 +321,7 @@ def get_azure_resources(
     billable_only: bool = Query(False),
     billability: Optional[str] = Query(None),
     tagging_scope: Optional[str] = Query(None),
+    task_id: Optional[int] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -310,7 +340,8 @@ def get_azure_resources(
     )
     
     query = apply_inventory_filters(query, search=search, billable_only=billable_only, billability=billability, tagging_scope=tagging_scope, resource_type=type)
-        
+    if task_id:
+        query = apply_task_filter(query, db, task_id, current_user, CloudProvider.AZURE)
     resources = query.all()
     
     results = []
@@ -349,6 +380,7 @@ def get_aws_regions(
     billable_only: bool = Query(False),
     billability: Optional[str] = Query(None),
     tagging_scope: Optional[str] = Query(None),
+    task_id: Optional[int] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -371,6 +403,8 @@ def get_aws_regions(
     )
     
     base_query = apply_inventory_filters(base_query, search=search, billable_only=billable_only, billability=billability, tagging_scope=tagging_scope)
+    if task_id:
+        base_query = apply_task_filter(base_query, db, task_id, current_user, CloudProvider.AWS)
     results = base_query.group_by(
         Resource.location
     ).all()
@@ -394,6 +428,7 @@ def get_aws_resource_types(
     billable_only: bool = Query(False),
     billability: Optional[str] = Query(None),
     tagging_scope: Optional[str] = Query(None),
+    task_id: Optional[int] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -417,6 +452,8 @@ def get_aws_resource_types(
     )
     
     base_query = apply_inventory_filters(base_query, search=search, billable_only=billable_only, billability=billability, tagging_scope=tagging_scope)
+    if task_id:
+        base_query = apply_task_filter(base_query, db, task_id, current_user, CloudProvider.AWS)
     results = base_query.group_by(
         Resource.resource_type
     ).all()
@@ -443,6 +480,7 @@ def get_aws_resources(
     billable_only: bool = Query(False),
     billability: Optional[str] = Query(None),
     tagging_scope: Optional[str] = Query(None),
+    task_id: Optional[int] = Query(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
@@ -461,7 +499,8 @@ def get_aws_resources(
     )
     
     query = apply_inventory_filters(query, search=search, billable_only=billable_only, billability=billability, tagging_scope=tagging_scope, resource_type=type)
-        
+    if task_id:
+        query = apply_task_filter(query, db, task_id, current_user, CloudProvider.AWS)
     resources = query.all()
     
     results = []

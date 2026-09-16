@@ -25,12 +25,13 @@ class TaggingBatch(Base):
     cloud = Column(Enum(CloudProvider), nullable=False)
     scope = Column(String(255), nullable=True)
     status = Column(Enum(BatchStatus), default=BatchStatus.PENDING_APPROVAL, nullable=False)
+    task_assignment_id = Column(Integer, ForeignKey("task_assignments.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
+    task_assignment = relationship("TaskAssignment")
     changes = relationship("TaggingChange", back_populates="batch")
     approvals = relationship("Approval", back_populates="batch")
-    script_jobs = relationship("ScriptJob", back_populates="batch")
 
 class ChangeStatus(str, enum.Enum):
     DRAFT = "DRAFT"
@@ -103,14 +104,29 @@ class ScriptJob(Base):
     id = Column(Integer, primary_key=True, index=True)
     job_id = Column(String(255), unique=True, index=True, nullable=False)
     cloud = Column(Enum(CloudProvider), nullable=False)
-    batch_id = Column(Integer, ForeignKey("tagging_batches.id"), nullable=False)
     script_type = Column(Enum(ScriptType), nullable=False)
     status = Column(Enum(JobStatus), default=JobStatus.GENERATED, nullable=False)
+    
+    script_version = Column(Integer, default=1, nullable=False)
+    manifest_hash = Column(String(255), nullable=True)
+    ingestion_token_hash = Column(String(255), nullable=True)
+    
     created_by = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-    batch = relationship("TaggingBatch", back_populates="script_jobs")
+    changes = relationship("ScriptJobChange", back_populates="job")
     execution_results = relationship("ExecutionResult", back_populates="job")
+
+class ScriptJobChange(Base):
+    __tablename__ = "script_job_changes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    job_id = Column(Integer, ForeignKey("script_jobs.id"), nullable=False)
+    change_id = Column(Integer, ForeignKey("tagging_changes.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    job = relationship("ScriptJob", back_populates="changes")
+    change = relationship("TaggingChange")
 
 class ExecutionStatus(str, enum.Enum):
     SUCCESS = "SUCCESS"
@@ -124,10 +140,20 @@ class ExecutionResult(Base):
     id = Column(Integer, primary_key=True, index=True)
     job_id = Column(Integer, ForeignKey("script_jobs.id"), nullable=False)
     resource_id = Column(Integer, ForeignKey("resources.id"), nullable=False)
+    change_id = Column(Integer, ForeignKey("tagging_changes.id"), nullable=True)
     status = Column(Enum(ExecutionStatus), default=ExecutionStatus.PENDING, nullable=False)
+    
+    reason_code = Column(String(255), nullable=True)
     message = Column(String(1024), nullable=True)
+    
+    expected_value = Column(String(255), nullable=True)
+    proposed_value = Column(String(255), nullable=True)
+    actual_value_before = Column(String(255), nullable=True)
+    actual_value_after = Column(String(255), nullable=True)
+    
     executed_at = Column(DateTime(timezone=True), nullable=True)
     validated_at = Column(DateTime(timezone=True), nullable=True)
 
     job = relationship("ScriptJob", back_populates="execution_results")
     resource = relationship("Resource")
+    change = relationship("TaggingChange")

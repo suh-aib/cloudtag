@@ -5,16 +5,34 @@ import { Button } from "../../components/ui/Button";
 import { InventoryFilters } from "../../components/ui/InventoryFilters";
 import type { InventoryFilters as APIFilters } from "../../services/api/inventory";
 import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { getProviderAccounts, type InventoryAccount } from "../../services/api/inventory";
+import { TaskAssignmentBanner } from "../../components/tagging/TaskAssignmentBanner";
+import { ConfirmAssignmentModal } from "../../components/tagging/ConfirmAssignmentModal";
+import type { CreateAssignmentPayload } from "../../types/assignment";
 
 export default function Azure() {
-  const { getToken } = useAuth();
+  const { getToken, user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const assignUserId = searchParams.get("assign_user_id");
+  const taskId = searchParams.get("task_id");
+  
   const [accounts, setAccounts] = useState<InventoryAccount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filters, setFilters] = useState<APIFilters>({});
+  const [filters, setFilters] = useState<APIFilters>({ ...(taskId ? { task_id: parseInt(taskId, 10) } : {}) });
+  
+  const [assignPayload, setAssignPayload] = useState<CreateAssignmentPayload | null>(null);
+
+  const getQueryString = () => {
+    const p = new URLSearchParams();
+    if (assignUserId) p.append("assign_user_id", assignUserId);
+    if (taskId) p.append("task_id", taskId);
+    const s = p.toString();
+    return s ? `?${s}` : "";
+  };
+
 
   useEffect(() => {
     setIsLoading(true);
@@ -33,6 +51,7 @@ export default function Azure() {
   }, [getToken, filters]);
   return (
     <div className="space-y-6 max-w-6xl mx-auto py-2">
+      <TaskAssignmentBanner />
       <div className="flex justify-between items-start">
         <div className="flex flex-col gap-1">
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">Azure Subscriptions</h1>
@@ -94,11 +113,23 @@ export default function Azure() {
                       </span>
                     </TableCell>
                     <TableCell className="text-right space-x-2">
-                      <Button variant="outline" size="sm" className="h-8 border-purple-200 text-purple-700 hover:bg-purple-50" onClick={() => navigate(`/bulk-tagging/wizard?provider=AZURE&scopeType=SUBSCRIPTION&accountId=${encodeURIComponent(acc.account_identifier)}`)}>
-                        Bulk Tag
-                      </Button>
+                      {user?.role === "ADMIN" && assignUserId && (
+                        <Button variant="outline" size="sm" className="h-8 border-azure-200 text-azure hover:bg-azure-50" onClick={() => setAssignPayload({
+                          provider: "AZURE",
+                          scope_type: "SUBSCRIPTION",
+                          subscription_id: acc.account_identifier,
+                          assigned_user_id: parseInt(assignUserId)
+                        })}>
+                          Assign Task
+                        </Button>
+                      )}
+                      {!assignUserId && (
+                        <Button variant="outline" size="sm" className="h-8 border-purple-200 text-purple-700 hover:bg-purple-50" onClick={() => navigate(`/bulk-tagging/wizard?provider=AZURE&scopeType=SUBSCRIPTION&accountId=${encodeURIComponent(acc.account_identifier)}${taskId ? `&task_id=${taskId}` : ''}`)}>
+                          Bulk Tag
+                        </Button>
+                      )}
                       <Button variant="ghost" size="sm" className="h-8 text-azure hover:bg-azure-light" asChild>
-                        <Link to={`/azure/${encodeURIComponent(acc.account_identifier)}`}>
+                        <Link to={`/azure/${encodeURIComponent(acc.account_identifier)}${getQueryString()}`}>
                           View
                         </Link>
                       </Button>
@@ -110,6 +141,15 @@ export default function Azure() {
           </Table>
         </CardContent>
       </Card>
+      
+      {assignPayload && assignUserId && (
+        <ConfirmAssignmentModal
+          isOpen={!!assignPayload}
+          onClose={() => setAssignPayload(null)}
+          assignUserId={assignUserId}
+          payload={assignPayload}
+        />
+      )}
     </div>
   );
 }

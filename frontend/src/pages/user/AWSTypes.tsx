@@ -5,18 +5,36 @@ import { Badge } from "../../components/ui/Badge";
 import { InventoryFilters } from "../../components/ui/InventoryFilters";
 import type { InventoryFilters as APIFilters } from "../../services/api/inventory";
 import { useState, useEffect } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { getAWSResourceTypes, getProviderAccounts, type ResourceTypeCount } from "../../services/api/inventory";
+import { TaskAssignmentBanner } from "../../components/tagging/TaskAssignmentBanner";
+import { ConfirmAssignmentModal } from "../../components/tagging/ConfirmAssignmentModal";
+import type { CreateAssignmentPayload } from "../../types/assignment";
 
 export default function AWSTypes() {
   const { accountId, region } = useParams<{ accountId: string; region: string }>();
   const navigate = useNavigate();
-  const { getToken } = useAuth();
+  const [searchParams] = useSearchParams();
+  const assignUserId = searchParams.get("assign_user_id");
+  const taskId = searchParams.get("task_id");
+
+  const { getToken, user } = useAuth();
   const [types, setTypes] = useState<ResourceTypeCount[]>([]);
   const [accountName, setAccountName] = useState<string>(accountId || '');
   const [isLoading, setIsLoading] = useState(true);
-  const [filters, setFilters] = useState<APIFilters>({});
+  const [filters, setFilters] = useState<APIFilters>({ ...(taskId ? { task_id: parseInt(taskId, 10) } : {}) });
+
+  const [assignPayload, setAssignPayload] = useState<CreateAssignmentPayload | null>(null);
+
+  const getQueryString = () => {
+    const p = new URLSearchParams();
+    if (assignUserId) p.append("assign_user_id", assignUserId);
+    if (taskId) p.append("task_id", taskId);
+    const s = p.toString();
+    return s ? `?${s}` : "";
+  };
+
 
   useEffect(() => {
     if (!accountId || !region) return;
@@ -46,14 +64,15 @@ export default function AWSTypes() {
 
   return (
     <div className="space-y-6 max-w-6xl mx-auto py-2">
+      <TaskAssignmentBanner />
       {/* Breadcrumbs */}
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-        <Link to="/aws" className="hover:text-aws transition-colors flex items-center gap-1">
+        <Link to={`/aws${getQueryString()}`} className="hover:text-aws transition-colors flex items-center gap-1">
           <Cloud size={14} />
           AWS
         </Link>
         <ChevronRight size={14} />
-        <Link to={`/aws/${encodeURIComponent(accountId || '')}`} className="hover:text-aws transition-colors truncate max-w-[200px]">
+        <Link to={`/aws/${encodeURIComponent(accountId || '')}${getQueryString()}`} className="hover:text-aws transition-colors truncate max-w-[200px]">
           {accountName}
         </Link>
         <ChevronRight size={14} />
@@ -102,7 +121,7 @@ export default function AWSTypes() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {types.map((type) => (
             <Card key={type.resource_type} className="border-gray-200 hover:shadow-md transition-shadow group">
-              <Link to={`/aws/${encodeURIComponent(accountId || '')}/${encodeURIComponent(region || '')}/${encodeURIComponent(type.resource_type)}`}>
+              <Link to={`/aws/${encodeURIComponent(accountId || '')}/${encodeURIComponent(region || '')}/${encodeURIComponent(type.resource_type)}${getQueryString()}`}>
                 <CardContent className="p-6 flex flex-col h-full justify-between gap-4">
                   <div>
                     <h3 className="font-bold text-lg text-gray-900 mb-1 truncate">{type.display_name}</h3>
@@ -125,17 +144,39 @@ export default function AWSTypes() {
                       {type.resource_count} resources
                     </span>
                     <div className="flex items-center gap-1">
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="h-8 text-xs border-purple-200 text-purple-700 hover:bg-purple-50"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          navigate(`/bulk-tagging/wizard?provider=AWS&scopeType=RESOURCE_TYPE&accountId=${encodeURIComponent(accountId || '')}&region=${encodeURIComponent(region || '')}&resourceType=${encodeURIComponent(type.resource_type)}`);
-                        }}
-                      >
-                        Bulk Tag
-                      </Button>
+                      {user?.role === "ADMIN" && assignUserId && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-8 text-xs border-aws-200 text-aws hover:bg-aws-50"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setAssignPayload({
+                              provider: "AWS",
+                              scope_type: "RESOURCE_TYPE",
+                              account_id: accountId || '',
+                              region_id: region || '',
+                              resource_type: type.resource_type,
+                              assigned_user_id: parseInt(assignUserId)
+                            });
+                          }}
+                        >
+                          Assign Task
+                        </Button>
+                      )}
+                      {!assignUserId && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-8 text-xs border-purple-200 text-purple-700 hover:bg-purple-50"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            navigate(`/bulk-tagging/wizard?provider=AWS&scopeType=RESOURCE_TYPE&accountId=${encodeURIComponent(accountId || '')}&region=${encodeURIComponent(region || '')}&resourceType=${encodeURIComponent(type.resource_type)}${taskId ? `&task_id=${taskId}` : ''}`);
+                          }}
+                        >
+                          Bulk Tag
+                        </Button>
+                      )}
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-aws opacity-0 group-hover:opacity-100 transition-opacity">
                         <ArrowRight size={18} />
                       </Button>
@@ -146,6 +187,15 @@ export default function AWSTypes() {
             </Card>
           ))}
         </div>
+      )}
+
+      {assignPayload && assignUserId && (
+        <ConfirmAssignmentModal
+          isOpen={!!assignPayload}
+          onClose={() => setAssignPayload(null)}
+          assignUserId={assignUserId}
+          payload={assignPayload}
+        />
       )}
     </div>
   );

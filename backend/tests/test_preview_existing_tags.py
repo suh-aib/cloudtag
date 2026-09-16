@@ -14,11 +14,10 @@ def override_get_current_user():
     from app.models.user import User
     return User(id=999, email="admin@test.com", role=UserRole.ADMIN)
 
-from app.api.deps import get_current_user
-app.dependency_overrides[get_current_user] = override_get_current_user
-
 @pytest.fixture(autouse=True)
 def setup_data():
+    from app.api.deps import get_current_user
+    app.dependency_overrides[get_current_user] = override_get_current_user
     with Session(engine) as session:
         # Create a mock resource with no ENVIRONMENT but other tags
         res1 = Resource(
@@ -66,6 +65,7 @@ def setup_data():
         session.delete(res2)
         session.delete(res3)
         session.commit()
+        app.dependency_overrides.pop(get_current_user, None)
 
 def test_preview_bulk_tagging_existing_tags(setup_data):
     res1_id, res2_id, res3_id = setup_data

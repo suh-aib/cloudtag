@@ -55,6 +55,7 @@ export interface InventoryFilters {
   tagging_scope?: string;
   resource_type?: string;
   location?: string;
+  task_id?: number;
 }
 
 const buildQueryString = (filters?: InventoryFilters, additionalParams?: Record<string, string>) => {
@@ -67,6 +68,7 @@ const buildQueryString = (filters?: InventoryFilters, additionalParams?: Record<
     if (filters.tagging_scope) params.append('tagging_scope', filters.tagging_scope);
     if (filters.resource_type) params.append('resource_type', filters.resource_type);
     if (filters.location) params.append('location', filters.location);
+    if (filters.task_id !== undefined) params.append('task_id', filters.task_id.toString());
   }
   
   if (additionalParams) {

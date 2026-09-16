@@ -1,26 +1,52 @@
 import { useState, useEffect } from "react";
-import { Cloud, ChevronRight, Server, Tags } from "lucide-react";
+import { Cloud, ChevronRight, Server, Tags, UserPlus } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/Table";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
 import { InventoryFilters } from "../../components/ui/InventoryFilters";
 import type { InventoryFilters as APIFilters } from "../../services/api/inventory";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../contexts/AuthContext";
 import { getAWSResources, getProviderAccounts, type ResourceDetail } from "../../services/api/inventory";
-import { useNavigate } from "react-router-dom";
+import { TaskAssignmentBanner } from "../../components/tagging/TaskAssignmentBanner";
+import { ConfirmAssignmentModal } from "../../components/tagging/ConfirmAssignmentModal";
+import type { CreateAssignmentPayload } from "../../types/assignment";
 
 export default function AWSResources() {
   const { accountId, region, resourceType } = useParams<{ accountId: string; region: string; resourceType: string }>();
   const navigate = useNavigate();
-  const { getToken } = useAuth();
+  const [searchParams] = useSearchParams();
+  const assignUserId = searchParams.get("assign_user_id");
+  const taskId = searchParams.get("task_id");
+
+  const { getToken, user } = useAuth();
   const [resources, setResources] = useState<ResourceDetail[]>([]);
   const [accountName, setAccountName] = useState<string>(accountId || '');
   const [isLoading, setIsLoading] = useState(true);
-  const [filters, setFilters] = useState<APIFilters>({});
+  const [filters, setFilters] = useState<APIFilters>({ ...(taskId ? { task_id: parseInt(taskId, 10) } : {}) });
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [assignPayload, setAssignPayload] = useState<CreateAssignmentPayload | null>(null);
+
+  const getQueryString = () => {
+    const p = new URLSearchParams();
+    if (assignUserId) p.append("assign_user_id", assignUserId);
+    if (taskId) p.append("task_id", taskId);
+    const s = p.toString();
+    return s ? `?${s}` : "";
+  };
+
+
+  const handleOpenAssignSelected = () => {
+    if (!assignUserId) return;
+    setAssignPayload({
+      provider: "AWS",
+      scope_type: "RESOURCE_SELECTION",
+      resource_ids: Array.from(selectedIds).map(String),
+      assigned_user_id: parseInt(assignUserId)
+    });
+  };
 
   useEffect(() => {
     if (!accountId || !region || !resourceType) return;
@@ -72,18 +98,19 @@ export default function AWSResources() {
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto py-2">
+      <TaskAssignmentBanner />
       {/* Breadcrumbs */}
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-        <Link to="/aws" className="hover:text-aws transition-colors flex items-center gap-1">
+        <Link to={`/aws${getQueryString()}`} className="hover:text-aws transition-colors flex items-center gap-1">
           <Cloud size={14} />
           AWS
         </Link>
         <ChevronRight size={14} />
-        <Link to={`/aws/${encodeURIComponent(accountId || '')}`} className="hover:text-aws transition-colors truncate max-w-[150px]">
+        <Link to={`/aws/${encodeURIComponent(accountId || '')}${getQueryString()}`} className="hover:text-aws transition-colors truncate max-w-[150px]">
           {accountName}
         </Link>
         <ChevronRight size={14} />
-        <Link to={`/aws/${encodeURIComponent(accountId || '')}/${encodeURIComponent(region || '')}`} className="hover:text-aws transition-colors truncate max-w-[150px]">
+        <Link to={`/aws/${encodeURIComponent(accountId || '')}/${encodeURIComponent(region || '')}${getQueryString()}`} className="hover:text-aws transition-colors truncate max-w-[150px]">
           {region}
         </Link>
         <ChevronRight size={14} />
@@ -95,12 +122,14 @@ export default function AWSResources() {
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">{displayType}</h1>
           <p className="text-sm text-gray-500 font-mono">{resourceType}</p>
         </div>
-        <Card className="shadow-sm border-gray-200 min-w-[120px]">
-          <CardContent className="p-4 flex flex-col items-center justify-center text-center bg-gray-50/50">
-            <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Total Resources</span>
-            <span className="text-2xl font-bold text-gray-900">{resources.length}</span>
-          </CardContent>
-        </Card>
+        <div className="flex items-center gap-4">
+          <Card className="shadow-sm border-gray-200 min-w-[120px]">
+            <CardContent className="p-4 flex flex-col items-center justify-center text-center bg-gray-50/50">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Total Resources</span>
+              <span className="text-2xl font-bold text-gray-900">{resources.length}</span>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <Card className="shadow-sm border-gray-200">
@@ -121,9 +150,21 @@ export default function AWSResources() {
               <Button variant="ghost" size="sm" onClick={clearSelection} className="h-8 text-gray-500 hover:text-gray-900">
                 Clear
               </Button>
-              <Button size="sm" className="h-8 gap-2 bg-aws hover:bg-aws-dark" onClick={() => navigate(`/bulk-tagging/wizard?provider=AWS&scopeType=RESOURCE_SELECTION&resourceIds=${Array.from(selectedIds).join(',')}`)}>
-                <Tags size={16} /> Bulk Tag
-              </Button>
+              {user?.role === "ADMIN" && assignUserId && (
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="h-8 gap-2 bg-white text-gray-700 border-aws/30 hover:bg-aws/5"
+                  onClick={handleOpenAssignSelected}
+                >
+                  <UserPlus size={16} className="text-aws" /> Assign Selected
+                </Button>
+              )}
+              {!assignUserId && (
+                <Button size="sm" className="h-8 gap-2 bg-aws hover:bg-aws-dark" onClick={() => navigate(`/bulk-tagging/wizard?provider=AWS&scopeType=RESOURCE_SELECTION&resourceIds=${Array.from(selectedIds).join(',')}${taskId ? `&task_id=${taskId}` : ''}`)}>
+                  <Tags size={16} /> Bulk Tag
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -212,17 +253,34 @@ export default function AWSResources() {
                           {res.status.replace(/_/g, ' ')}
                         </span>
                       </TableCell>
-                      <TableCell>
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="h-8 text-aws hover:bg-aws-light"
-                          onClick={() => {
-                            navigate(`/bulk-tagging/wizard?provider=AWS&scopeType=RESOURCE_SELECTION&resourceIds=${res.id}`);
-                          }}
-                        >
-                          Tag
-                        </Button>
+                      <TableCell className="space-x-1 whitespace-nowrap">
+                        {user?.role === "ADMIN" && assignUserId && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 text-aws hover:bg-aws-light"
+                            onClick={() => setAssignPayload({
+                              provider: "AWS",
+                              scope_type: "RESOURCE_SELECTION",
+                              resource_ids: [String(res.id)],
+                              assigned_user_id: parseInt(assignUserId)
+                            })}
+                          >
+                            Assign
+                          </Button>
+                        )}
+                        {!assignUserId && (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-8 text-aws hover:bg-aws-light"
+                            onClick={() => {
+                              navigate(`/bulk-tagging/wizard?provider=AWS&scopeType=RESOURCE_SELECTION&resourceIds=${res.id}${taskId ? `&task_id=${taskId}` : ''}`);
+                            }}
+                          >
+                            Tag
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))
@@ -232,7 +290,15 @@ export default function AWSResources() {
           </div>
         </CardContent>
       </Card>
-      
+
+      {assignPayload && assignUserId && (
+        <ConfirmAssignmentModal
+          isOpen={!!assignPayload}
+          onClose={() => setAssignPayload(null)}
+          assignUserId={assignUserId}
+          payload={assignPayload}
+        />
+      )}
     </div>
   );
 }

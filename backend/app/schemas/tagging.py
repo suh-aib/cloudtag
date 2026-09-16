@@ -41,6 +41,7 @@ class BulkTagRequestSchema(BaseModel):
     resource_type: Optional[str] = None
     resource_ids: Optional[List[int]] = None
     tags: Dict[str, str]
+    task_id: Optional[int] = None
     status: Optional[str] = "PENDING_APPROVAL"
 
 class BatchResponseSchema(BaseModel):

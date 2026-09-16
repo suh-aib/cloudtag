@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models.user import User
 from app.api.deps import get_current_user
 from app.models.master_data import TagDefinition, TagValue, TagProvider
+from app.models.assignment import TaskAssignment, TaskAssignmentResource, TaskAssignmentStatus
 from app.models.tagging import TaggingBatch, TaggingChange, BatchStatus, ChangeStatus, Approval, ApprovalStatus
 from app.models.resource import Resource
 from app.schemas.tagging import (
@@ -36,6 +37,14 @@ def get_tag_definitions(
                 TagDefinition.provider == provider.value,
                 TagDefinition.provider == TagProvider.SHARED
             )
+        )
+
+    if getattr(request, 'task_id', None):
+        query = query.join(
+            TaskAssignmentResource,
+            TaskAssignmentResource.resource_id == Resource.id
+        ).filter(
+            TaskAssignmentResource.assignment_id == request.task_id
         )
     return query.all()
 
@@ -74,6 +83,14 @@ def resolve_resources_for_scope(db: Session, request: BulkTagRequestSchema):
             raise HTTPException(status_code=400, detail="Resource IDs required for selection scope")
         query = query.filter(Resource.id.in_(request.resource_ids))
         
+
+    if getattr(request, 'task_id', None):
+        query = query.join(
+            TaskAssignmentResource,
+            TaskAssignmentResource.resource_id == Resource.id
+        ).filter(
+            TaskAssignmentResource.assignment_id == request.task_id
+        )
     return query.all()
 
 def validate_tags(db: Session, provider: CloudProvider, proposed_tags: dict):
@@ -99,6 +116,18 @@ def preview_bulk_tagging(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+
+    if getattr(request, 'task_id', None):
+        task = db.query(TaskAssignment).filter(TaskAssignment.id == request.task_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found.")
+        if task.assigned_user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Unauthorized access to task resources.")
+        if task.status != TaskAssignmentStatus.ACTIVE:
+            raise HTTPException(status_code=400, detail="Task is not active.")
+        if task.provider != request.provider:
+            raise HTTPException(status_code=400, detail="Provider mismatch for this task.")
+            
     resources = resolve_resources_for_scope(db, request)
     validate_tags(db, request.provider, request.tags)
     
@@ -132,6 +161,18 @@ def create_bulk_tagging_proposal(
     if not request.tags:
         raise HTTPException(status_code=400, detail="No tags proposed")
 
+
+    if getattr(request, 'task_id', None):
+        task = db.query(TaskAssignment).filter(TaskAssignment.id == request.task_id).first()
+        if not task:
+            raise HTTPException(status_code=404, detail="Task not found.")
+        if task.assigned_user_id != current_user.id:
+            raise HTTPException(status_code=403, detail="Unauthorized access to task resources.")
+        if task.status != TaskAssignmentStatus.ACTIVE:
+            raise HTTPException(status_code=400, detail="Task is not active.")
+        if task.provider != request.provider:
+            raise HTTPException(status_code=400, detail="Provider mismatch for this task.")
+            
     resources = resolve_resources_for_scope(db, request)
     if not resources:
         raise HTTPException(status_code=404, detail="No resources found for the given scope")
@@ -152,7 +193,8 @@ def create_bulk_tagging_proposal(
         created_by=current_user.id,
         cloud=request.provider,
         scope=scope_desc,
-        status=requested_status
+        status=requested_status,
+        task_assignment_id=getattr(request, 'task_id', None)
     )
     db.add(batch)
     db.flush()
