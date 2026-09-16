@@ -1,4 +1,4 @@
-import { Cloud, ChevronRight, Layers, ArrowRight } from "lucide-react";
+import { Cloud, ChevronRight, Layers, ArrowRight, Tags } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { Badge } from "../../components/ui/Badge";
@@ -26,6 +26,30 @@ export default function AzureResourceTypes() {
   const [filters, setFilters] = useState<APIFilters>({ ...(taskId ? { task_id: parseInt(taskId, 10) } : {}) });
 
   const [assignPayload, setAssignPayload] = useState<CreateAssignmentPayload | null>(null);
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedIds(new Set(types.map(t => t.resource_type)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleSelectResource = (id: string, checked: boolean) => {
+    const newSet = new Set(selectedIds);
+    if (checked) {
+      newSet.add(id);
+    } else {
+      newSet.delete(id);
+    }
+    setSelectedIds(newSet);
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
 
   const getQueryString = () => {
     const p = new URLSearchParams();
@@ -100,12 +124,52 @@ export default function AzureResourceTypes() {
         </div>
       </div>
 
-      <div className="bg-white p-4 border border-gray-200 rounded-lg shadow-sm mb-6">
-        <InventoryFilters 
-          onFiltersChange={setFilters} 
-          showLocationFilter={false}
-          showResourceTypeFilter={true}
-        />
+      <div className="bg-white p-4 border border-gray-200 rounded-lg shadow-sm mb-6 flex flex-col sm:flex-row justify-between gap-4 items-start sm:items-center">
+        <div className="flex-1 w-full">
+          <InventoryFilters 
+            onFiltersChange={setFilters} 
+            showLocationFilter={false}
+            showResourceTypeFilter={true}
+          />
+        </div>
+        
+        <div className="flex items-center gap-4 shrink-0">
+          <label className="flex items-center gap-2 text-sm text-gray-700 font-medium cursor-pointer">
+            <input 
+              type="checkbox" 
+              className="rounded border-gray-300 text-azure focus:ring-azure cursor-pointer"
+              checked={types.length > 0 && selectedIds.size === types.length}
+              ref={input => {
+                if (input) {
+                  input.indeterminate = selectedIds.size > 0 && selectedIds.size < types.length;
+                }
+              }}
+              onChange={handleSelectAll}
+              disabled={isLoading || types.length === 0}
+            />
+            Select All
+          </label>
+          
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-3 bg-azure-light/30 px-3 py-1 rounded-md border border-azure/20">
+              <span className="text-sm font-medium text-azure-dark">
+                {selectedIds.size} selected
+              </span>
+              <Button variant="ghost" size="sm" onClick={clearSelection} className="h-7 px-2 text-gray-500 hover:text-gray-900 text-xs">
+                Clear
+              </Button>
+              {!assignUserId && (
+                <Button 
+                  size="sm" 
+                  className="h-7 px-3 gap-1.5 bg-azure hover:bg-azure-dark text-xs" 
+                  onClick={() => navigate(`/bulk-tagging/wizard?provider=AZURE&scopeType=RESOURCE_TYPE&accountId=${encodeURIComponent(subscription || '')}&resourceGroup=${encodeURIComponent(resourceGroup || '')}&resourceType=${encodeURIComponent(Array.from(selectedIds).join(','))}${taskId ? `&task_id=${taskId}` : ''}`)}
+                >
+                  <Tags size={14} /> Bulk Tag
+                </Button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {isLoading ? (
@@ -120,7 +184,15 @@ export default function AzureResourceTypes() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {types.map((type) => (
-            <Card key={type.resource_type} className="border-gray-200 hover:shadow-md transition-shadow group">
+            <Card key={type.resource_type} className={`border-gray-200 hover:shadow-md transition-shadow group relative ${selectedIds.has(type.resource_type) ? 'ring-2 ring-azure bg-azure-light/5' : ''}`}>
+              <div className="absolute top-4 right-4 z-10" onClick={(e) => e.stopPropagation()}>
+                <input 
+                  type="checkbox" 
+                  className="rounded border-gray-300 text-azure focus:ring-azure h-4 w-4 bg-white cursor-pointer"
+                  checked={selectedIds.has(type.resource_type)}
+                  onChange={(e) => handleSelectResource(type.resource_type, e.target.checked)}
+                />
+              </div>
               <Link to={`/azure/${encodeURIComponent(subscription || '')}/${encodeURIComponent(resourceGroup || '')}/${encodeURIComponent(type.resource_type)}${getQueryString()}`}>
                 <CardContent className="p-6 flex flex-col h-full justify-between gap-4">
                   <div>
@@ -164,19 +236,7 @@ export default function AzureResourceTypes() {
                           Assign Task
                         </Button>
                       )}
-                      {!assignUserId && (
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="h-8 text-xs border-purple-200 text-purple-700 hover:bg-purple-50"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            navigate(`/bulk-tagging/wizard?provider=AZURE&scopeType=RESOURCE_TYPE&accountId=${encodeURIComponent(subscription || '')}&resourceGroup=${encodeURIComponent(resourceGroup || '')}&resourceType=${encodeURIComponent(type.resource_type)}${taskId ? `&task_id=${taskId}` : ''}`);
-                          }}
-                        >
-                          Bulk Tag
-                        </Button>
-                      )}
+
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-azure opacity-0 group-hover:opacity-100 transition-opacity">
                         <ArrowRight size={18} />
                       </Button>

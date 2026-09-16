@@ -19,7 +19,7 @@ export interface TagDefinition {
   values: TagValue[];
 }
 
-export type ScopeType = 'SUBSCRIPTION' | 'RESOURCE_GROUP' | 'RESOURCE_TYPE' | 'RESOURCE_SELECTION' | 'AWS_ACCOUNT';
+export type ScopeType = 'SUBSCRIPTION' | 'RESOURCE_GROUP' | 'RESOURCE_TYPE' | 'RESOURCE_SELECTION' | 'AWS_ACCOUNT' | 'REGION';
 
 export interface BulkTagRequest {
   provider: 'AZURE' | 'AWS';
@@ -27,6 +27,7 @@ export interface BulkTagRequest {
   account_id?: string;
   resource_group?: string;
   resource_type?: string;
+  region?: string;
   resource_ids?: number[];
   tags: Record<string, string>;
   task_id?: number;

@@ -11,6 +11,7 @@ class ScopeType(str, Enum):
     RESOURCE_TYPE = "RESOURCE_TYPE"
     RESOURCE_SELECTION = "RESOURCE_SELECTION"
     AWS_ACCOUNT = "AWS_ACCOUNT"
+    REGION = "REGION"
 
 class TagValueSchema(BaseModel):
     id: int
@@ -39,6 +40,7 @@ class BulkTagRequestSchema(BaseModel):
     account_id: Optional[str] = None
     resource_group: Optional[str] = None
     resource_type: Optional[str] = None
+    region: Optional[str] = None
     resource_ids: Optional[List[int]] = None
     tags: Dict[str, str]
     task_id: Optional[int] = None

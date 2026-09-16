@@ -54,7 +54,7 @@ export default function AzureResourceList() {
     getToken().then(token => {
       if (token) {
         Promise.all([
-          getAzureResources(token, subscription, resourceGroup, resourceType),
+          getAzureResources(token, subscription, resourceGroup, resourceType, filters),
           getProviderAccounts(token, 'azure', filters)
         ])
           .then(([data, accountsData]) => {

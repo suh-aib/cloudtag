@@ -50,21 +50,21 @@ export default function TaskDetail({ adminMode = false }: TaskDetailProps) {
     let url = "";
     if (task.provider === "AZURE") {
       if (task.scope_type === "SUBSCRIPTION" || task.scope_type === "ACCOUNT") {
-        url = `/azure/accounts/${task.subscription_id || task.account_id}/resource-groups`;
+        url = `/azure/${task.subscription_id || task.account_id}`;
       } else if (task.scope_type === "RESOURCE_GROUP") {
-        url = `/azure/accounts/${task.subscription_id || task.account_id}/resource-groups/${task.resource_group}/types`;
+        url = `/azure/${task.subscription_id || task.account_id}/${task.resource_group}`;
       } else if (task.scope_type === "RESOURCE_TYPE") {
-        url = `/azure/accounts/${task.subscription_id || task.account_id}/resource-groups/${task.resource_group}/resources?type=${encodeURIComponent(task.resource_type)}`;
+        url = `/azure/${task.subscription_id || task.account_id}/${task.resource_group}/${encodeURIComponent(task.resource_type)}`;
       } else {
         url = `/azure`;
       }
     } else if (task.provider === "AWS") {
       if (task.scope_type === "ACCOUNT") {
-        url = `/aws/accounts/${task.account_id}/regions`;
+        url = `/aws/${task.account_id}`;
       } else if (task.scope_type === "REGION") {
-        url = `/aws/accounts/${task.account_id}/regions/${task.region_id || task.region}/types`;
+        url = `/aws/${task.account_id}/${task.region_id || task.region}`;
       } else if (task.scope_type === "RESOURCE_TYPE") {
-        url = `/aws/accounts/${task.account_id}/regions/${task.region_id || task.region}/resources?type=${encodeURIComponent(task.resource_type)}`;
+        url = `/aws/${task.account_id}/${task.region_id || task.region}/${encodeURIComponent(task.resource_type)}`;
       } else {
         url = `/aws`;
       }

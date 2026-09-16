@@ -1,4 +1,4 @@
-import { Cloud, ChevronRight, Folder } from "lucide-react";
+import { Cloud, ChevronRight, Folder, Tags } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/Table";
 import { Button } from "../../components/ui/Button";
@@ -54,6 +54,30 @@ export default function AWSRegions() {
   const [filters, setFilters] = useState<APIFilters>({ ...(taskId ? { task_id: parseInt(taskId, 10) } : {}) });
 
   const [assignPayload, setAssignPayload] = useState<CreateAssignmentPayload | null>(null);
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedIds(new Set(regions.map(r => r.name)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleSelectResource = (id: string, checked: boolean) => {
+    const newSet = new Set(selectedIds);
+    if (checked) {
+      newSet.add(id);
+    } else {
+      newSet.delete(id);
+    }
+    setSelectedIds(newSet);
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
 
   const getQueryString = () => {
     const p = new URLSearchParams();
@@ -126,17 +150,53 @@ export default function AWSRegions() {
       </div>
 
       <Card className="shadow-sm border-gray-200">
-        <div className="p-4 border-b border-gray-200">
-          <InventoryFilters 
-            onFiltersChange={setFilters} 
-            showLocationFilter={false}
-            showResourceTypeFilter={false}
-          />
+        <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between gap-4">
+          <div className="flex-1">
+            <InventoryFilters 
+              onFiltersChange={setFilters} 
+              showLocationFilter={false}
+              showResourceTypeFilter={false}
+            />
+          </div>
+
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-4 bg-aws-light/30 px-4 py-1 rounded-md border border-aws/20">
+              <span className="text-sm font-medium text-aws-dark">
+                Selected: {selectedIds.size} regions
+              </span>
+              <Button variant="ghost" size="sm" onClick={clearSelection} className="h-8 text-gray-500 hover:text-gray-900">
+                Clear
+              </Button>
+              {!assignUserId && (
+                <Button 
+                  size="sm" 
+                  className="h-8 gap-2 bg-aws hover:bg-aws-dark text-white" 
+                  onClick={() => navigate(`/bulk-tagging/wizard?provider=AWS&scopeType=REGION&accountId=${encodeURIComponent(accountId || '')}&region=${encodeURIComponent(Array.from(selectedIds).join(','))}${taskId ? `&task_id=${taskId}` : ''}`)}
+                >
+                  <Tags size={16} /> Bulk Tag
+                </Button>
+              )}
+            </div>
+          )}
         </div>
         <CardContent className="p-0">
           <Table>
             <TableHeader className="bg-gray-50">
               <TableRow>
+                <TableHead className="w-12 text-center">
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-gray-300 text-aws focus:ring-aws"
+                    checked={regions.length > 0 && selectedIds.size === regions.length}
+                    ref={input => {
+                      if (input) {
+                        input.indeterminate = selectedIds.size > 0 && selectedIds.size < regions.length;
+                      }
+                    }}
+                    onChange={handleSelectAll}
+                    disabled={isLoading || regions.length === 0}
+                  />
+                </TableHead>
                 <TableHead className="font-semibold text-gray-700">Region</TableHead>
                                 <TableHead className="font-semibold text-gray-700 text-center">Resource Types</TableHead>
                 <TableHead className="font-semibold text-gray-700 text-center">Resources</TableHead>
@@ -162,7 +222,15 @@ export default function AWSRegions() {
                 </TableRow>
               ) : (
                 regions.map(regionObj => (
-                  <TableRow key={regionObj.name} className="hover:bg-gray-50/50">
+                  <TableRow key={regionObj.name} className={`hover:bg-gray-50/50 ${selectedIds.has(regionObj.name) ? 'bg-aws-light/20' : ''}`}>
+                    <TableCell className="text-center">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-gray-300 text-aws focus:ring-aws"
+                        checked={selectedIds.has(regionObj.name)}
+                        onChange={(e) => handleSelectResource(regionObj.name, e.target.checked)}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium text-gray-900">{getRegionDisplayName(regionObj.name)}</TableCell>
                     <TableCell className="text-center">{regionObj.types_count}</TableCell>
                     <TableCell className="text-center">
@@ -182,11 +250,7 @@ export default function AWSRegions() {
                           Assign Task
                         </Button>
                       )}
-                      {!assignUserId && (
-                        <Button variant="outline" size="sm" className="h-8 border-purple-200 text-purple-700 hover:bg-purple-50" onClick={() => navigate(`/bulk-tagging/wizard?provider=AWS&scopeType=REGION&accountId=${encodeURIComponent(accountId || '')}&region=${encodeURIComponent(regionObj.name)}${taskId ? `&task_id=${taskId}` : ''}`)}>
-                          Bulk Tag
-                        </Button>
-                      )}
+
                       <Button variant="ghost" size="sm" className="h-8 text-aws hover:bg-aws-light" asChild>
                         <Link to={`/aws/${encodeURIComponent(accountId || '')}/${encodeURIComponent(regionObj.name)}${getQueryString()}`}>
                           View

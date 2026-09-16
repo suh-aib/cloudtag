@@ -39,44 +39,55 @@ def get_tag_definitions(
             )
         )
 
-    if getattr(request, 'task_id', None):
-        query = query.join(
-            TaskAssignmentResource,
-            TaskAssignmentResource.resource_id == Resource.id
-        ).filter(
-            TaskAssignmentResource.assignment_id == request.task_id
-        )
     return query.all()
 
 def resolve_resources_for_scope(db: Session, request: BulkTagRequestSchema):
     query = db.query(Resource).filter(Resource.provider == request.provider)
     
-    if request.scope_type == ScopeType.SUBSCRIPTION or request.scope_type == ScopeType.AWS_ACCOUNT:
+    if request.scope_type in [ScopeType.SUBSCRIPTION, ScopeType.AWS_ACCOUNT]:
         if not request.account_id:
             raise HTTPException(status_code=400, detail="Account ID required for this scope")
-        # Find the account id
-        account = db.query(CloudAccount).filter(CloudAccount.account_identifier == request.account_id).first()
-        if not account:
+        accounts = [acc.strip() for acc in request.account_id.split(',')]
+        account_ids = db.query(CloudAccount.id).filter(CloudAccount.account_identifier.in_(accounts)).all()
+        if not account_ids:
             raise HTTPException(status_code=404, detail="Account not found")
-        query = query.filter(Resource.cloud_account_id == account.id)
+        query = query.filter(Resource.cloud_account_id.in_([a[0] for a in account_ids]))
     
     elif request.scope_type == ScopeType.RESOURCE_GROUP:
         if not request.account_id or not request.resource_group:
             raise HTTPException(status_code=400, detail="Account ID and Resource Group required")
-        account = db.query(CloudAccount).filter(CloudAccount.account_identifier == request.account_id).first()
-        if not account:
+        accounts = [acc.strip() for acc in request.account_id.split(',')]
+        account_ids = db.query(CloudAccount.id).filter(CloudAccount.account_identifier.in_(accounts)).all()
+        if not account_ids:
             raise HTTPException(status_code=404, detail="Account not found")
-        query = query.filter(Resource.cloud_account_id == account.id, Resource.resource_group == request.resource_group)
+        rgs = [rg.strip() for rg in request.resource_group.split(',')]
+        query = query.filter(Resource.cloud_account_id.in_([a[0] for a in account_ids]), Resource.resource_group.in_(rgs))
         
     elif request.scope_type == ScopeType.RESOURCE_TYPE:
         if not request.account_id or not request.resource_type:
             raise HTTPException(status_code=400, detail="Account ID and Resource Type required")
-        account = db.query(CloudAccount).filter(CloudAccount.account_identifier == request.account_id).first()
-        if not account:
+        accounts = [acc.strip() for acc in request.account_id.split(',')]
+        account_ids = db.query(CloudAccount.id).filter(CloudAccount.account_identifier.in_(accounts)).all()
+        if not account_ids:
             raise HTTPException(status_code=404, detail="Account not found")
-        query = query.filter(Resource.cloud_account_id == account.id, Resource.resource_type == request.resource_type)
+        rts = [rt.strip() for rt in request.resource_type.split(',')]
+        query = query.filter(Resource.cloud_account_id.in_([a[0] for a in account_ids]), Resource.resource_type.in_(rts))
         if request.resource_group:
-            query = query.filter(Resource.resource_group == request.resource_group)
+            rgs = [rg.strip() for rg in request.resource_group.split(',')]
+            query = query.filter(Resource.resource_group.in_(rgs))
+        if request.region:
+            regs = [r.strip() for r in request.region.split(',')]
+            query = query.filter(Resource.location.in_(regs))
+            
+    elif request.scope_type == ScopeType.REGION:
+        if not request.account_id or not request.region:
+            raise HTTPException(status_code=400, detail="Account ID and Region required")
+        accounts = [acc.strip() for acc in request.account_id.split(',')]
+        account_ids = db.query(CloudAccount.id).filter(CloudAccount.account_identifier.in_(accounts)).all()
+        if not account_ids:
+            raise HTTPException(status_code=404, detail="Account not found")
+        regs = [r.strip() for r in request.region.split(',')]
+        query = query.filter(Resource.cloud_account_id.in_([a[0] for a in account_ids]), Resource.location.in_(regs))
             
     elif request.scope_type == ScopeType.RESOURCE_SELECTION:
         if not request.resource_ids:

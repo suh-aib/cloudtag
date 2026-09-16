@@ -1,4 +1,4 @@
-import { Server } from "lucide-react";
+import { Server, Tags } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/Table";
 import { Button } from "../../components/ui/Button";
@@ -24,6 +24,30 @@ export default function AWS() {
   const [filters, setFilters] = useState<APIFilters>({ ...(taskId ? { task_id: parseInt(taskId, 10) } : {}) });
   
   const [assignPayload, setAssignPayload] = useState<CreateAssignmentPayload | null>(null);
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedIds(new Set(accounts.map(a => a.account_identifier)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleSelectResource = (id: string, checked: boolean) => {
+    const newSet = new Set(selectedIds);
+    if (checked) {
+      newSet.add(id);
+    } else {
+      newSet.delete(id);
+    }
+    setSelectedIds(newSet);
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
 
   const getQueryString = () => {
     const p = new URLSearchParams();
@@ -66,17 +90,53 @@ export default function AWS() {
       </div>
 
       <Card className="shadow-sm border-gray-200">
-        <div className="p-4 border-b border-gray-200">
-          <InventoryFilters 
-            onFiltersChange={setFilters} 
-            showLocationFilter={false}
-            showResourceTypeFilter={false}
-          />
+        <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between gap-4">
+          <div className="flex-1">
+            <InventoryFilters 
+              onFiltersChange={setFilters} 
+              showLocationFilter={false}
+              showResourceTypeFilter={false}
+            />
+          </div>
+
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-4 bg-aws-light/30 px-4 py-1 rounded-md border border-aws/20">
+              <span className="text-sm font-medium text-aws-dark">
+                Selected: {selectedIds.size} accounts
+              </span>
+              <Button variant="ghost" size="sm" onClick={clearSelection} className="h-8 text-gray-500 hover:text-gray-900">
+                Clear
+              </Button>
+              {!assignUserId && (
+                <Button 
+                  size="sm" 
+                  className="h-8 gap-2 bg-aws hover:bg-aws-dark text-white" 
+                  onClick={() => navigate(`/bulk-tagging/wizard?provider=AWS&scopeType=AWS_ACCOUNT&accountId=${Array.from(selectedIds).join(',')}${taskId ? `&task_id=${taskId}` : ''}`)}
+                >
+                  <Tags size={16} /> Bulk Tag
+                </Button>
+              )}
+            </div>
+          )}
         </div>
         <CardContent className="p-0">
           <Table>
             <TableHeader className="bg-gray-50">
               <TableRow>
+                <TableHead className="w-12 text-center">
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-gray-300 text-aws focus:ring-aws"
+                    checked={accounts.length > 0 && selectedIds.size === accounts.length}
+                    ref={input => {
+                      if (input) {
+                        input.indeterminate = selectedIds.size > 0 && selectedIds.size < accounts.length;
+                      }
+                    }}
+                    onChange={handleSelectAll}
+                    disabled={isLoading || accounts.length === 0}
+                  />
+                </TableHead>
                 <TableHead className="font-semibold text-gray-700">Account Name</TableHead>
                 <TableHead className="font-semibold text-gray-700">Account ID</TableHead>
                 <TableHead className="font-semibold text-gray-700 text-center">Regions</TableHead>
@@ -87,13 +147,13 @@ export default function AWS() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-16 text-center text-gray-500">
+                  <TableCell colSpan={6} className="py-16 text-center text-gray-500">
                     Loading accounts...
                   </TableCell>
                 </TableRow>
               ) : accounts.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-16 text-center">
+                  <TableCell colSpan={6} className="py-16 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400 space-y-3">
                       <Server size={48} className="text-aws/40" />
                       <p className="text-sm font-medium text-gray-600">No AWS accounts available</p>
@@ -103,7 +163,15 @@ export default function AWS() {
                 </TableRow>
               ) : (
                 accounts.map(acc => (
-                  <TableRow key={acc.account_identifier} className="hover:bg-gray-50/50">
+                  <TableRow key={acc.account_identifier} className={`hover:bg-gray-50/50 ${selectedIds.has(acc.account_identifier) ? 'bg-aws-light/20' : ''}`}>
+                    <TableCell className="text-center">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-gray-300 text-aws focus:ring-aws"
+                        checked={selectedIds.has(acc.account_identifier)}
+                        onChange={(e) => handleSelectResource(acc.account_identifier, e.target.checked)}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium text-gray-900">{acc.account_name}</TableCell>
                     <TableCell className="text-gray-500 font-mono text-xs">{acc.account_identifier}</TableCell>
                     <TableCell className="text-center">{acc.group_count}</TableCell>
@@ -123,11 +191,7 @@ export default function AWS() {
                           Assign Task
                         </Button>
                       )}
-                      {!assignUserId && (
-                        <Button variant="outline" size="sm" className="h-8 border-purple-200 text-purple-700 hover:bg-purple-50" onClick={() => navigate(`/bulk-tagging/wizard?provider=AWS&scopeType=AWS_ACCOUNT&accountId=${encodeURIComponent(acc.account_identifier)}${taskId ? `&task_id=${taskId}` : ''}`)}>
-                          Bulk Tag
-                        </Button>
-                      )}
+
                       <Button variant="ghost" size="sm" className="h-8 text-aws hover:bg-aws-light" asChild>
                         <Link to={`/aws/${encodeURIComponent(acc.account_identifier)}${getQueryString()}`}>
                           View

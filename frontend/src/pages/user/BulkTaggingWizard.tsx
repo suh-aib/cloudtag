@@ -38,6 +38,7 @@ export default function BulkTaggingWizard() {
   const accountId = searchParams.get('accountId') || undefined;
   const resourceGroup = searchParams.get('resourceGroup') || undefined;
   const resourceType = searchParams.get('resourceType') || undefined;
+  const region = searchParams.get('region') || undefined;
   const resourceIdsParam = searchParams.get('resourceIds');
   const resourceIds = resourceIdsParam ? resourceIdsParam.split(',').map(Number) : undefined;
   
@@ -97,6 +98,7 @@ export default function BulkTaggingWizard() {
         account_id: accountId,
         resource_group: resourceGroup,
         resource_type: resourceType,
+        region: region,
         resource_ids: resourceIds,
         tags: selectedTags
       };
@@ -124,6 +126,7 @@ export default function BulkTaggingWizard() {
         account_id: accountId,
         resource_group: resourceGroup,
         resource_type: resourceType,
+        region: region,
         resource_ids: resourceIds,
         tags: selectedTags,
         status: status
@@ -150,6 +153,7 @@ export default function BulkTaggingWizard() {
         <div><span className="text-gray-500">Scope Type:</span> <span className="font-semibold text-gray-900">{scopeType}</span></div>
         {accountId && <div><span className="text-gray-500">Account:</span> <span className="font-mono text-xs bg-white px-1.5 py-0.5 rounded border">{accountId}</span></div>}
         {resourceGroup && <div><span className="text-gray-500">Group:</span> <span className="font-semibold text-gray-900">{resourceGroup}</span></div>}
+        {region && <div><span className="text-gray-500">Region:</span> <span className="font-semibold text-gray-900">{region}</span></div>}
         {resourceType && <div><span className="text-gray-500">Type:</span> <span className="font-semibold text-gray-900">{resourceType}</span></div>}
         {resourceIds && <div><span className="text-gray-500">Selected Resources:</span> <span className="font-semibold text-gray-900">{resourceIds.length}</span></div>}
       </div>

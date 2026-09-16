@@ -1,4 +1,4 @@
-import { Cloud, ChevronRight, Folder } from "lucide-react";
+import { Cloud, ChevronRight, Folder, Tags } from "lucide-react";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/Table";
 import { Button } from "../../components/ui/Button";
@@ -27,6 +27,30 @@ export default function AzureResourceGroups() {
 
   const [assignPayload, setAssignPayload] = useState<CreateAssignmentPayload | null>(null);
 
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
+  const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.checked) {
+      setSelectedIds(new Set(groups.map(g => g.name)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
+  const handleSelectResource = (id: string, checked: boolean) => {
+    const newSet = new Set(selectedIds);
+    if (checked) {
+      newSet.add(id);
+    } else {
+      newSet.delete(id);
+    }
+    setSelectedIds(newSet);
+  };
+
+  const clearSelection = () => {
+    setSelectedIds(new Set());
+  };
+
   const getQueryString = () => {
     const p = new URLSearchParams();
     if (assignUserId) p.append("assign_user_id", assignUserId);
@@ -43,7 +67,7 @@ export default function AzureResourceGroups() {
       if (token) {
 
         Promise.all([
-          getAzureResourceGroups(token, subscription),
+          getAzureResourceGroups(token, subscription, filters),
           getProviderAccounts(token, 'azure', filters)
         ])
           .then(([groupsData, accountsData]) => {
@@ -98,17 +122,53 @@ export default function AzureResourceGroups() {
       </div>
 
       <Card className="shadow-sm border-gray-200">
-        <div className="p-4 border-b border-gray-200">
-          <InventoryFilters 
-            onFiltersChange={setFilters} 
-            showLocationFilter={false}
-            showResourceTypeFilter={false}
-          />
+        <div className="p-4 border-b border-gray-200 flex flex-col sm:flex-row justify-between gap-4">
+          <div className="flex-1">
+            <InventoryFilters 
+              onFiltersChange={setFilters} 
+              showLocationFilter={false}
+              showResourceTypeFilter={false}
+            />
+          </div>
+
+          {selectedIds.size > 0 && (
+            <div className="flex items-center gap-4 bg-azure-light/30 px-4 py-1 rounded-md border border-azure/20">
+              <span className="text-sm font-medium text-azure-dark">
+                Selected: {selectedIds.size} groups
+              </span>
+              <Button variant="ghost" size="sm" onClick={clearSelection} className="h-8 text-gray-500 hover:text-gray-900">
+                Clear
+              </Button>
+              {!assignUserId && (
+                <Button 
+                  size="sm" 
+                  className="h-8 gap-2 bg-azure hover:bg-azure-dark" 
+                  onClick={() => navigate(`/bulk-tagging/wizard?provider=AZURE&scopeType=RESOURCE_GROUP&accountId=${encodeURIComponent(subscription || '')}&resourceGroup=${encodeURIComponent(Array.from(selectedIds).join(','))}${taskId ? `&task_id=${taskId}` : ''}`)}
+                >
+                  <Tags size={16} /> Bulk Tag
+                </Button>
+              )}
+            </div>
+          )}
         </div>
         <CardContent className="p-0">
           <Table>
             <TableHeader className="bg-gray-50">
               <TableRow>
+                <TableHead className="w-12 text-center">
+                  <input 
+                    type="checkbox" 
+                    className="rounded border-gray-300 text-azure focus:ring-azure"
+                    checked={groups.length > 0 && selectedIds.size === groups.length}
+                    ref={input => {
+                      if (input) {
+                        input.indeterminate = selectedIds.size > 0 && selectedIds.size < groups.length;
+                      }
+                    }}
+                    onChange={handleSelectAll}
+                    disabled={isLoading || groups.length === 0}
+                  />
+                </TableHead>
                 <TableHead className="font-semibold text-gray-700">Resource Group Name</TableHead>
                 <TableHead className="font-semibold text-gray-700">Region(s)</TableHead>
                 <TableHead className="font-semibold text-gray-700 text-center">Resource Types</TableHead>
@@ -119,13 +179,13 @@ export default function AzureResourceGroups() {
             <TableBody>
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-16 text-center text-gray-500">
+                  <TableCell colSpan={6} className="py-16 text-center text-gray-500">
                     Loading resource groups...
                   </TableCell>
                 </TableRow>
               ) : groups.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="py-16 text-center">
+                  <TableCell colSpan={6} className="py-16 text-center">
                     <div className="flex flex-col items-center justify-center text-gray-400 space-y-3">
                       <Folder size={48} className="text-azure/40" />
                       <p className="text-sm font-medium text-gray-600">No resource groups available</p>
@@ -135,7 +195,15 @@ export default function AzureResourceGroups() {
                 </TableRow>
               ) : (
                 groups.map(group => (
-                  <TableRow key={group.name} className="hover:bg-gray-50/50">
+                  <TableRow key={group.name} className={`hover:bg-gray-50/50 ${selectedIds.has(group.name) ? 'bg-azure-light/20' : ''}`}>
+                    <TableCell className="text-center">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-gray-300 text-azure focus:ring-azure"
+                        checked={selectedIds.has(group.name)}
+                        onChange={(e) => handleSelectResource(group.name, e.target.checked)}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium text-gray-900">{group.name}</TableCell>
                     <TableCell className="text-gray-500 text-xs">{group.locations.join(', ') || 'N/A'}</TableCell>
                     <TableCell className="text-center">{group.types_count}</TableCell>
@@ -156,11 +224,7 @@ export default function AzureResourceGroups() {
                           Assign Task
                         </Button>
                       )}
-                      {!assignUserId && (
-                        <Button variant="outline" size="sm" className="h-8 border-purple-200 text-purple-700 hover:bg-purple-50" onClick={() => navigate(`/bulk-tagging/wizard?provider=AZURE&scopeType=RESOURCE_GROUP&accountId=${encodeURIComponent(subscription || '')}&resourceGroup=${encodeURIComponent(group.name)}${taskId ? `&task_id=${taskId}` : ''}`)}>
-                          Bulk Tag
-                        </Button>
-                      )}
+
                       <Button variant="ghost" size="sm" className="h-8 text-azure hover:bg-azure-light" asChild>
                         <Link to={`/azure/${encodeURIComponent(subscription || '')}/${encodeURIComponent(group.name)}${getQueryString()}`}>
                           View
