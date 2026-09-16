@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
-import { Download, Terminal } from "lucide-react";
+import { Terminal, ChevronRight } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "../../components/ui/Card";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "../../components/ui/Table";
 import { Badge } from "../../components/ui/Badge";
 import { useAuth } from "../../contexts/AuthContext";
-import { getScriptJobs, downloadScriptPackage } from "../../services/api/scripts";
+import { getScriptJobs } from "../../services/api/scripts";
 
 interface ScriptJob {
   id: number;
@@ -17,6 +18,7 @@ interface ScriptJob {
 
 export default function ScriptGeneration() {
   const { getToken } = useAuth();
+  const navigate = useNavigate();
   const [jobs, setJobs] = useState<ScriptJob[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -36,23 +38,8 @@ export default function ScriptGeneration() {
     loadJobs();
   }, [getToken]);
 
-  const handleDownload = async (jobId: string) => {
-    try {
-      const token = await getToken();
-      if (!token) return;
-      const blob = await downloadScriptPackage(token, jobId);
-      
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `CloudTag-${jobId}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (err: any) {
-      alert(`Error downloading script package: ${err.message}`);
-    }
+  const handleView = (jobId: string) => {
+    navigate(`/admin/script-generation/${jobId}`);
   };
 
   const renderStatus = (status: string) => {
@@ -104,14 +91,12 @@ export default function ScriptGeneration() {
                     <TableCell>{new Date(job.created_at).toLocaleString()}</TableCell>
                     <TableCell>{renderStatus(job.status)}</TableCell>
                     <TableCell className="text-right">
-                      {job.status === 'GENERATED' && (
-                        <button
-                          onClick={() => handleDownload(job.job_id)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 text-sm font-medium text-azure hover:bg-azure/5 rounded"
-                        >
-                          <Download size={14} /> Download Package
-                        </button>
-                      )}
+                      <button
+                        onClick={() => handleView(job.job_id)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 text-sm font-medium text-azure hover:text-azure-dark rounded"
+                      >
+                        View Job <ChevronRight size={14} />
+                      </button>
                     </TableCell>
                   </TableRow>
                 ))}

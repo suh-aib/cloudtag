@@ -142,10 +142,25 @@ export default function AzureResourceGroups() {
               {!assignUserId && (
                 <Button 
                   size="sm" 
-                  className="h-8 gap-2 bg-azure hover:bg-azure-dark" 
+                  className="h-8 gap-2 bg-azure hover:bg-azure-dark text-white" 
                   onClick={() => navigate(`/bulk-tagging/wizard?provider=AZURE&scopeType=RESOURCE_GROUP&accountId=${encodeURIComponent(subscription || '')}&resourceGroup=${encodeURIComponent(Array.from(selectedIds).join(','))}${taskId ? `&task_id=${taskId}` : ''}`)}
                 >
                   <Tags size={16} /> Bulk Tag
+                </Button>
+              )}
+              {assignUserId && (
+                <Button 
+                  size="sm" 
+                  className="h-8 gap-2 bg-azure hover:bg-azure-dark text-white" 
+                  onClick={() => setAssignPayload({
+                    provider: "AZURE",
+                    scope_type: "RESOURCE_GROUP",
+                    subscription_id: subscription || '',
+                    resource_group: Array.from(selectedIds).join(','),
+                    assigned_user_id: parseInt(assignUserId)
+                  })}
+                >
+                  Assign Task
                 </Button>
               )}
             </div>

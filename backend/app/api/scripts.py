@@ -17,8 +17,7 @@ import datetime
 router = APIRouter()
 
 class GenerateRequest(BaseModel):
-    provider: CloudProvider
-    account_id_filter: str = None
+    batch_ids: List[int]
 
 class IngestResultItem(BaseModel):
     change_id: int
@@ -45,8 +44,7 @@ def generate_script(
         new_job, manifest, token = ScriptGeneratorService.generate_apply_job(
             db=db,
             user_id=admin.id,
-            provider=request.provider,
-            account_id_filter=request.account_id_filter
+            batch_ids=request.batch_ids
         )
         return {
             "job_id": new_job.job_id,
@@ -78,6 +76,7 @@ def download_script(
             .join(CloudAccount, Resource.cloud_account_id == CloudAccount.id)\
             .join(ScriptJobChange, TaggingChange.id == ScriptJobChange.change_id)\
             .filter(ScriptJobChange.job_id == job.id)\
+            .order_by(Resource.id, TaggingChange.id)\
             .all()
             
     manifest = ScriptGeneratorService._build_manifest(job_id, job.cloud, changes_query)
@@ -101,6 +100,62 @@ def download_script(
         media_type="application/zip", 
         headers={"Content-Disposition": f"attachment; filename=CloudTag-{job_id}.zip"}
     )
+
+@router.get("/{job_id}")
+def get_script_job_detail(
+    job_id: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user)
+):
+    job = db.query(ScriptJob).filter(ScriptJob.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    changes_query = db.query(TaggingChange, Resource, CloudAccount)\
+            .join(Resource, TaggingChange.resource_id == Resource.id)\
+            .join(CloudAccount, Resource.cloud_account_id == CloudAccount.id)\
+            .join(ScriptJobChange, TaggingChange.id == ScriptJobChange.change_id)\
+            .filter(ScriptJobChange.job_id == job.id)\
+            .order_by(Resource.id, TaggingChange.id)\
+            .all()
+            
+    manifest = ScriptGeneratorService._build_manifest(job_id, job.cloud, changes_query)
+    
+    if manifest["manifest_hash"] != job.manifest_hash:
+        raise HTTPException(status_code=500, detail="Manifest hash mismatch. Underlying data may have been corrupted.")
+        
+    return {
+        "job_id": job.job_id,
+        "cloud": job.cloud.value,
+        "script_type": job.script_type.value,
+        "status": job.status.value,
+        "created_at": job.created_at,
+        "manifest": manifest
+    }
+
+@router.get("/{job_id}/preview")
+def get_script_job_preview(
+    job_id: str,
+    db: Session = Depends(get_db),
+    admin: User = Depends(get_admin_user)
+):
+    job = db.query(ScriptJob).filter(ScriptJob.job_id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+        
+    from app.services import script_templates
+    
+    if job.cloud.value == "AWS":
+        apply_script = script_templates.get_aws_apply_script()
+        revert_script = script_templates.get_aws_revert_script()
+    else:
+        apply_script = script_templates.get_azure_apply_script()
+        revert_script = script_templates.get_azure_revert_script()
+        
+    return {
+        "apply_script": apply_script,
+        "revert_script": revert_script
+    }
 
 @router.get("")
 def list_script_jobs(

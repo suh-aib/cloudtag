@@ -31,6 +31,7 @@ import TagConfiguration from "./pages/admin/TagConfiguration";
 import AdminSavedTags from "./pages/admin/AdminSavedTags";
 import AssignedTags from "./pages/admin/AssignedTags";
 import ScriptGeneration from "./pages/admin/ScriptGeneration";
+import ScriptJobDetail from "./pages/admin/ScriptJobDetail";
 import AuditLogs from "./pages/admin/AuditLogs";
 import ApprovalWorkspace from "./pages/admin/ApprovalWorkspace";
 import TaggingApprovals from "./pages/admin/TaggingApprovals";
@@ -100,6 +101,7 @@ function App() {
                 <Route path="saved-tags" element={<AdminSavedTags />} />
                 <Route path="assigned-tags" element={<AssignedTags />} />
                 <Route path="script-generation" element={<ScriptGeneration />} />
+                <Route path="script-generation/:jobId" element={<ScriptJobDetail />} />
                 <Route path="audit-logs" element={<AuditLogs />} />
               </Route>
 

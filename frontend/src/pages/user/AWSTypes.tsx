@@ -167,6 +167,22 @@ export default function AWSTypes() {
                   <Tags size={14} /> Bulk Tag
                 </Button>
               )}
+              {assignUserId && (
+                <Button 
+                  size="sm" 
+                  className="h-7 px-3 gap-1.5 bg-aws hover:bg-aws-dark text-white text-xs" 
+                  onClick={() => setAssignPayload({
+                    provider: "AWS",
+                    scope_type: "RESOURCE_TYPE",
+                    account_id: accountId || '',
+                    region_id: region || '',
+                    resource_type: Array.from(selectedIds).join(','),
+                    assigned_user_id: parseInt(assignUserId)
+                  })}
+                >
+                  Assign Task
+                </Button>
+              )}
             </div>
           )}
         </div>

@@ -229,8 +229,9 @@ function ApprovedWorkTab() {
     try {
       const token = await getToken();
       if (!token) throw new Error("No token");
-      await generateScriptJob(token, group.cloud, group.scope);
-      navigate('/admin/script-generation');
+      const batchIds = group.batches.map(b => b.id);
+      const job = await generateScriptJob(token, batchIds);
+      navigate(`/admin/script-generation/${job.job_id}`);
     } catch (err: any) {
       alert(`Error generating script: ${err.message}`);
     } finally {
@@ -290,7 +291,7 @@ function ApprovedWorkTab() {
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-white bg-azure rounded hover:bg-azure-dark disabled:opacity-50"
                           >
                             <Terminal size={14} />
-                            {generating === group.key ? "Generating..." : "Generate Script"}
+                            {generating === group.key ? "Generating..." : "Review / Generate Script"}
                           </button>
                         </TableCell>
                       </TableRow>

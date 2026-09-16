@@ -161,10 +161,26 @@ export default function AzureResourceTypes() {
               {!assignUserId && (
                 <Button 
                   size="sm" 
-                  className="h-7 px-3 gap-1.5 bg-azure hover:bg-azure-dark text-xs" 
+                  className="h-7 px-3 gap-1.5 bg-azure hover:bg-azure-dark text-white text-xs" 
                   onClick={() => navigate(`/bulk-tagging/wizard?provider=AZURE&scopeType=RESOURCE_TYPE&accountId=${encodeURIComponent(subscription || '')}&resourceGroup=${encodeURIComponent(resourceGroup || '')}&resourceType=${encodeURIComponent(Array.from(selectedIds).join(','))}${taskId ? `&task_id=${taskId}` : ''}`)}
                 >
                   <Tags size={14} /> Bulk Tag
+                </Button>
+              )}
+              {assignUserId && (
+                <Button 
+                  size="sm" 
+                  className="h-7 px-3 gap-1.5 bg-azure hover:bg-azure-dark text-white text-xs" 
+                  onClick={() => setAssignPayload({
+                    provider: "AZURE",
+                    scope_type: "RESOURCE_TYPE",
+                    subscription_id: subscription || '',
+                    resource_group: resourceGroup || '',
+                    resource_type: Array.from(selectedIds).join(','),
+                    assigned_user_id: parseInt(assignUserId)
+                  })}
+                >
+                  Assign Task
                 </Button>
               )}
             </div>

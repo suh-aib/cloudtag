@@ -27,34 +27,50 @@ def resolve_resources_for_payload(db: Session, payload: CreateAssignmentPayload)
     if payload.scope_type == "SUBSCRIPTION" or payload.scope_type == "ACCOUNT":
         if not payload.subscription_id and not payload.account_id:
             raise HTTPException(status_code=400, detail="Subscription/Account ID required for this scope.")
-        acc_id = payload.subscription_id or payload.account_id
-        acc = db.query(CloudAccount).filter(CloudAccount.account_identifier == acc_id).first()
-        if not acc:
-            acc = db.query(CloudAccount).filter(CloudAccount.name == acc_id).first()
-        if acc:
-            query = query.filter(Resource.cloud_account_id == acc.id)
-        else:
+        acc_ids = payload.subscription_id or payload.account_id
+        acc_id_list = [a.strip() for a in acc_ids.split(',')]
+        
+        # We need to map string identifiers (or names) to cloud account IDs
+        accounts = db.query(CloudAccount).filter(
+            or_(
+                CloudAccount.account_identifier.in_(acc_id_list),
+                CloudAccount.name.in_(acc_id_list)
+            )
+        ).all()
+        
+        valid_account_ids = [acc.id for acc in accounts]
+        # Also include any that might be direct integer IDs
+        for a in acc_id_list:
             try:
-                query = query.filter(Resource.cloud_account_id == int(acc_id))
+                valid_account_ids.append(int(a))
             except ValueError:
                 pass
+                
+        query = query.filter(Resource.cloud_account_id.in_(valid_account_ids))
                 
     elif payload.scope_type == "REGION":
         if not payload.region_id:
             raise HTTPException(status_code=400, detail="Region ID required.")
-        reg = db.query(CloudRegion).filter(or_(CloudRegion.name == payload.region_id, CloudRegion.display_name == payload.region_id)).first()
-        if reg:
-            query = query.filter(Resource.region_id == reg.id)
+        reg_id_list = [r.strip() for r in payload.region_id.split(',')]
+        regs = db.query(CloudRegion).filter(
+            or_(
+                CloudRegion.name.in_(reg_id_list),
+                CloudRegion.display_name.in_(reg_id_list)
+            )
+        ).all()
+        query = query.filter(Resource.region_id.in_([reg.id for reg in regs]))
             
     elif payload.scope_type == "RESOURCE_GROUP":
         if not payload.resource_group:
             raise HTTPException(status_code=400, detail="Resource Group required.")
-        query = query.filter(Resource.resource_group == payload.resource_group)
+        groups = [g.strip() for g in payload.resource_group.split(',')]
+        query = query.filter(Resource.resource_group.in_(groups))
         
     elif payload.scope_type == "RESOURCE_TYPE":
         if not payload.resource_type:
             raise HTTPException(status_code=400, detail="Resource Type required.")
-        query = query.filter(Resource.resource_type == payload.resource_type)
+        types = [t.strip() for t in payload.resource_type.split(',')]
+        query = query.filter(Resource.resource_type.in_(types))
         
     elif payload.scope_type == "RESOURCE_SELECTION":
         if not payload.resource_ids:

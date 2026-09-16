@@ -176,6 +176,21 @@ export default function AWSRegions() {
                   <Tags size={16} /> Bulk Tag
                 </Button>
               )}
+              {assignUserId && (
+                <Button 
+                  size="sm" 
+                  className="h-8 gap-2 bg-aws hover:bg-aws-dark text-white" 
+                  onClick={() => setAssignPayload({
+                    provider: "AWS",
+                    scope_type: "REGION",
+                    account_id: accountId || '',
+                    region_id: Array.from(selectedIds).join(','),
+                    assigned_user_id: parseInt(assignUserId)
+                  })}
+                >
+                  Assign Task
+                </Button>
+              )}
             </div>
           )}
         </div>

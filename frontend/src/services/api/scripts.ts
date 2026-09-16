@@ -9,10 +9,9 @@ function checkJsonResponse(data: any) {
   return data;
 }
 
-export async function generateScriptJob(token: string, provider: string, account_id_filter: string | null) {
+export async function generateScriptJob(token: string, batchIds: number[]) {
   const res = await axios.post(`${API_BASE_URL}/api/admin/scripts/generate`, {
-    provider,
-    account_id_filter
+    batch_ids: batchIds
   }, {
     headers: { Authorization: `Bearer ${token}` }
   });
@@ -21,6 +20,20 @@ export async function generateScriptJob(token: string, provider: string, account
 
 export async function getScriptJobs(token: string) {
   const res = await axios.get(`${API_BASE_URL}/api/admin/scripts`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return checkJsonResponse(res.data);
+}
+
+export async function getScriptJobDetail(token: string, jobId: string) {
+  const res = await axios.get(`${API_BASE_URL}/api/admin/scripts/${jobId}`, {
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  return checkJsonResponse(res.data);
+}
+
+export async function getScriptJobPreview(token: string, jobId: string) {
+  const res = await axios.get(`${API_BASE_URL}/api/admin/scripts/${jobId}/preview`, {
     headers: { Authorization: `Bearer ${token}` }
   });
   return checkJsonResponse(res.data);
