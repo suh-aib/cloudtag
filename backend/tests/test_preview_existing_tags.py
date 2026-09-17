@@ -90,7 +90,7 @@ def test_preview_bulk_tagging_existing_tags(setup_data):
     assert len(changes) == 3
     
     change_res1 = next(c for c in changes if c["resource_id"] == res1_id)
-    assert change_res1["current_value"] == "ABSENT"
+    assert change_res1["current_value"] == "NOT_SET"
     assert change_res1["proposed_value"] == "PROD"
     assert change_res1["will_change"] == True
     assert change_res1["existing_tags"] == {"APPNAME": "ABC", "ROLE": "WEB"}

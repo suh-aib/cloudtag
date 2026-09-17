@@ -29,6 +29,7 @@ export default function ScriptJobDetail() {
   const [preview, setPreview] = useState<{apply_script: string, revert_script: string} | null>(null);
   const [loadingPreview, setLoadingPreview] = useState(false);
   const [showScriptModal, setShowScriptModal] = useState<"apply" | "revert" | null>(null);
+  const [copied, setCopied] = useState(false);
 
   // Selected resource for the change detail panel
   const [selectedResource, setSelectedResource] = useState<any | null>(null);
@@ -107,8 +108,14 @@ export default function ScriptJobDetail() {
   }, [getToken, jobId]);
 
   const loadPreview = async (type: "apply" | "revert") => {
+    setLoadingPreview(true);
     setShowScriptModal(type);
-    if (preview) return; // already loaded
+    setCopied(false);
+    
+    if (preview) {
+      setLoadingPreview(false);
+      return;
+    }
     
     setLoadingPreview(true);
     try {
@@ -388,7 +395,21 @@ export default function ScriptJobDetail() {
                 <div className="text-center py-12 text-red-400">Failed to load script content.</div>
               )}
             </div>
-            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end rounded-b-lg">
+            <div className="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-between rounded-b-lg">
+              <button 
+                onClick={() => {
+                  if (preview) {
+                    const content = showScriptModal === "apply" ? preview.apply_script : preview.revert_script;
+                    navigator.clipboard.writeText(content);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }
+                }}
+                disabled={!preview || loadingPreview}
+                className="px-4 py-2 bg-azure border border-transparent rounded text-sm font-medium text-white hover:bg-azure-dark disabled:opacity-50"
+              >
+                {copied ? "Copied!" : "Copy Script"}
+              </button>
               <button 
                 onClick={() => setShowScriptModal(null)}
                 className="px-4 py-2 bg-white border border-gray-300 rounded text-sm font-medium text-gray-700 hover:bg-gray-50"

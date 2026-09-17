@@ -1,4 +1,7 @@
 import json
+
+def generate_script_templates_code():
+    code = """import json
 from app.models.cloud import CloudProvider
 
 def get_aws_apply_script(manifest: dict) -> str:
@@ -13,11 +16,11 @@ def get_aws_apply_script(manifest: dict) -> str:
         "",
         "echo 'Authenticating via AWS CLI...'",
         "CURRENT_ACCOUNT=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || echo '')",
-        "if [ -z \"$CURRENT_ACCOUNT\" ]; then",
+        "if [ -z \\"$CURRENT_ACCOUNT\\" ]; then",
         "    echo 'ERROR: Failed to get AWS identity. Please log in.'",
         "    exit 1",
         "fi",
-        "echo \"Active AWS Account: $CURRENT_ACCOUNT\"",
+        "echo \\"Active AWS Account: $CURRENT_ACCOUNT\\"",
         ""
     ]
     
@@ -25,7 +28,7 @@ def get_aws_apply_script(manifest: dict) -> str:
         expected_account = manifest["resources"][0].get("account_id")
         lines.extend([
             f"EXPECTED_ACCOUNT='{expected_account}'",
-            "if [ \"$EXPECTED_ACCOUNT\" != \"$CURRENT_ACCOUNT\" ]; then",
+            "if [ \\"$EXPECTED_ACCOUNT\\" != \\"$CURRENT_ACCOUNT\\" ]; then",
             "    echo 'TARGET_ACCOUNT_MISMATCH'",
             "    exit 1",
             "fi",
@@ -60,23 +63,23 @@ def get_aws_apply_script(manifest: dict) -> str:
         lines.append(f"    TOTAL=$((TOTAL + 1))")
         
         lines.append(f"    TAG_OUT=''")
-        lines.append(f"    if [ \"{res_type}\" = \"ec2/instance\" ]; then")
+        lines.append(f"    if [ \\"{res_type}\\" = \\"ec2/instance\\" ]; then")
         lines.append(f"        INSTANCE_ID=$(echo '{rid}' | awk -F'/' '{{print $2}}')")
-        lines.append(f"        aws ec2 describe-instances --instance-ids \"$INSTANCE_ID\" --region '{expected_region}' >/dev/null 2>&1")
+        lines.append(f"        aws ec2 describe-instances --instance-ids \\"$INSTANCE_ID\\" --region '{expected_region}' >/dev/null 2>&1")
         lines.append(f"        if [ $? -ne 0 ]; then")
         lines.append(f"            echo 'FAILED_PRECHECK: Resource does not exist or read failed'")
         lines.append(f"            FAILED_PRECHECK=$((FAILED_PRECHECK + 1))")
         lines.append(f"            return")
         lines.append(f"        fi")
-        lines.append(f"        TAG_OUT=$(aws ec2 describe-tags --filters \"Name=resource-id,Values=$INSTANCE_ID\" --region '{expected_region}' --output json 2>/dev/null)")
+        lines.append(f"        TAG_OUT=$(aws ec2 describe-tags --filters \\"Name=resource-id,Values=$INSTANCE_ID\\" --region '{expected_region}' --output json 2>/dev/null)")
         lines.append(f"        if [ $? -ne 0 ]; then")
         lines.append(f"            echo 'FAILED_PRECHECK: AWS CLI returned exit code non-zero for tags'")
         lines.append(f"            FAILED_PRECHECK=$((FAILED_PRECHECK + 1))")
         lines.append(f"            return")
         lines.append(f"        fi")
-        lines.append(f"    elif [ \"{res_type}\" = \"events/rule\" ]; then")
+        lines.append(f"    elif [ \\"{res_type}\\" = \\"events/rule\\" ]; then")
         lines.append(f"        RULE_NAME=$(echo '{rid}' | awk -F'rule/' '{{print $2}}')")
-        lines.append(f"        aws events describe-rule --name \"$RULE_NAME\" --region '{expected_region}' >/dev/null 2>&1")
+        lines.append(f"        aws events describe-rule --name \\"$RULE_NAME\\" --region '{expected_region}' >/dev/null 2>&1")
         lines.append(f"        if [ $? -ne 0 ]; then")
         lines.append(f"            echo 'FAILED_PRECHECK: Resource does not exist or read failed'")
         lines.append(f"            FAILED_PRECHECK=$((FAILED_PRECHECK + 1))")
@@ -100,7 +103,7 @@ def get_aws_apply_script(manifest: dict) -> str:
             k = chg.get("key")
             b = chg.get("before")
             
-            lines.append(f"    CURRENT_VAL=$(python3 -c \"")
+            lines.append(f"    CURRENT_VAL=$(python3 -c \\"")
             lines.append(f"import sys, json")
             lines.append(f"try:")
             lines.append(f"    data = json.loads(sys.stdin.read())")
@@ -110,29 +113,29 @@ def get_aws_apply_script(manifest: dict) -> str:
             lines.append(f"    else: print(tag)")
             lines.append(f"except:")
             lines.append(f"    print('JSON_ERROR')")
-            lines.append(f"\" <<< \"$TAG_OUT\")")
+            lines.append(f"\\" <<< \\"$TAG_OUT\\")")
             
-            lines.append(f"    if [ \"$CURRENT_VAL\" = 'JSON_ERROR' ]; then")
+            lines.append(f"    if [ \\"$CURRENT_VAL\\" = 'JSON_ERROR' ]; then")
             lines.append(f"        echo 'FAILED_PRECHECK: Malformed JSON'")
             lines.append(f"        FAILED_PRECHECK=$((FAILED_PRECHECK + 1))")
             lines.append(f"        return")
             lines.append(f"    fi")
             
             if b == "NOT_SET" or b is None:
-                lines.append(f"    if [ \"$CURRENT_VAL\" != 'NOT_SET' ]; then")
+                lines.append(f"    if [ \\"$CURRENT_VAL\\" != 'NOT_SET' ]; then")
                 lines.append(f"        echo 'SKIPPED_CURRENT_VALUE_CHANGED ({k} expected NOT_SET but was '$CURRENT_VAL')'")
                 lines.append(f"        IS_SAFE=0")
                 lines.append(f"    fi")
             else:
-                lines.append(f"    if [ \"$CURRENT_VAL\" = 'NOT_SET' ]; then")
+                lines.append(f"    if [ \\"$CURRENT_VAL\\" = 'NOT_SET' ]; then")
                 lines.append(f"        echo 'SKIPPED_CURRENT_VALUE_CHANGED ({k} expected {b} but was NOT_SET)'")
                 lines.append(f"        IS_SAFE=0")
-                lines.append(f"    elif [ \"$CURRENT_VAL\" != '{b}' ]; then")
+                lines.append(f"    elif [ \\"$CURRENT_VAL\\" != '{b}' ]; then")
                 lines.append(f"        echo 'SKIPPED_CURRENT_VALUE_CHANGED ({k} expected {b} but was '$CURRENT_VAL')'")
                 lines.append(f"        IS_SAFE=0")
                 lines.append(f"    fi")
                 
-        lines.append(f"    if [ \"$IS_SAFE\" -eq 0 ]; then")
+        lines.append(f"    if [ \\"$IS_SAFE\\" -eq 0 ]; then")
         lines.append(f"        SKIPPED_CURRENT_VALUE_CHANGED=$((SKIPPED_CURRENT_VALUE_CHANGED + 1))")
         lines.append(f"        return")
         lines.append(f"    fi")
@@ -157,26 +160,26 @@ def get_aws_apply_script(manifest: dict) -> str:
         
         if tags_to_add:
             joined_tags = " ".join(tags_to_add)
-            lines.append(f"    if [ \"{res_type}\" = \"ec2/instance\" ]; then")
-            lines.append(f"        aws ec2 create-tags --resources \"$INSTANCE_ID\" --tags {joined_tags} --region '{expected_region}' >/dev/null 2>&1")
+            lines.append(f"    if [ \\"{res_type}\\" = \\"ec2/instance\\" ]; then")
+            lines.append(f"        aws ec2 create-tags --resources \\"$INSTANCE_ID\\" --tags {joined_tags} --region '{expected_region}' >/dev/null 2>&1")
             lines.append(f"        if [ $? -ne 0 ]; then WRITE_FAILED=1; fi")
-            lines.append(f"    elif [ \"{res_type}\" = \"events/rule\" ]; then")
+            lines.append(f"    elif [ \\"{res_type}\\" = \\"events/rule\\" ]; then")
             lines.append(f"        aws events tag-resource --resource-arn '{rid}' --tags {joined_tags} --region '{expected_region}' >/dev/null 2>&1")
             lines.append(f"        if [ $? -ne 0 ]; then WRITE_FAILED=1; fi")
             lines.append(f"    fi")
             
         if keys_to_remove:
-            lines.append(f"    if [ \"{res_type}\" = \"ec2/instance\" ]; then")
+            lines.append(f"    if [ \\"{res_type}\\" = \\"ec2/instance\\" ]; then")
             joined_keys_ec2 = " ".join([f"Key={k}" for k in keys_to_remove])
-            lines.append(f"        aws ec2 delete-tags --resources \"$INSTANCE_ID\" --tags {joined_keys_ec2} --region '{expected_region}' >/dev/null 2>&1")
+            lines.append(f"        aws ec2 delete-tags --resources \\"$INSTANCE_ID\\" --tags {joined_keys_ec2} --region '{expected_region}' >/dev/null 2>&1")
             lines.append(f"        if [ $? -ne 0 ]; then WRITE_FAILED=1; fi")
-            lines.append(f"    elif [ \"{res_type}\" = \"events/rule\" ]; then")
-            joined_keys_events = " ".join([f"\"{k}\"" for k in keys_to_remove])
+            lines.append(f"    elif [ \\"{res_type}\\" = \\"events/rule\\" ]; then")
+            joined_keys_events = " ".join([f"\\"{k}\\"" for k in keys_to_remove])
             lines.append(f"        aws events untag-resource --resource-arn '{rid}' --tag-keys {joined_keys_events} --region '{expected_region}' >/dev/null 2>&1")
             lines.append(f"        if [ $? -ne 0 ]; then WRITE_FAILED=1; fi")
             lines.append(f"    fi")
             
-        lines.append(f"    if [ \"$WRITE_FAILED\" -eq 1 ]; then")
+        lines.append(f"    if [ \\"$WRITE_FAILED\\" -eq 1 ]; then")
         lines.append(f"        echo 'FAILED_WRITE: API call failed'")
         lines.append(f"        FAILED_WRITE=$((FAILED_WRITE + 1))")
         lines.append(f"        return")
@@ -187,14 +190,14 @@ def get_aws_apply_script(manifest: dict) -> str:
         # However, if there are NO mutations (only PRESERVE), it's safe to check.
         
         lines.append(f"    TAG_OUT_POST=''")
-        lines.append(f"    if [ \"{res_type}\" = \"ec2/instance\" ]; then")
-        lines.append(f"        TAG_OUT_POST=$(aws ec2 describe-tags --filters \"Name=resource-id,Values=$INSTANCE_ID\" --region '{expected_region}' --output json 2>/dev/null)")
+        lines.append(f"    if [ \\"{res_type}\\" = \\"ec2/instance\\" ]; then")
+        lines.append(f"        TAG_OUT_POST=$(aws ec2 describe-tags --filters \\"Name=resource-id,Values=$INSTANCE_ID\\" --region '{expected_region}' --output json 2>/dev/null)")
         lines.append(f"        if [ $? -ne 0 ]; then")
         lines.append(f"            echo 'FAILED_POST_VERIFY: Read API failed'")
         lines.append(f"            FAILED_POST_VERIFY=$((FAILED_POST_VERIFY + 1))")
         lines.append(f"            return")
         lines.append(f"        fi")
-        lines.append(f"    elif [ \"{res_type}\" = \"events/rule\" ]; then")
+        lines.append(f"    elif [ \\"{res_type}\\" = \\"events/rule\\" ]; then")
         lines.append(f"        TAG_OUT_POST=$(aws events list-tags-for-resource --resource-arn '{rid}' --region '{expected_region}' --output json 2>/dev/null)")
         lines.append(f"        if [ $? -ne 0 ]; then")
         lines.append(f"            echo 'FAILED_POST_VERIFY: Read API failed'")
@@ -208,7 +211,7 @@ def get_aws_apply_script(manifest: dict) -> str:
             k = chg.get("key")
             a = chg.get("after")
             
-            lines.append(f"    POST_VAL=$(python3 -c \"")
+            lines.append(f"    POST_VAL=$(python3 -c \\"")
             lines.append(f"import sys, json")
             lines.append(f"try:")
             lines.append(f"    data = json.loads(sys.stdin.read())")
@@ -218,29 +221,29 @@ def get_aws_apply_script(manifest: dict) -> str:
             lines.append(f"    else: print(tag)")
             lines.append(f"except:")
             lines.append(f"    print('JSON_ERROR')")
-            lines.append(f"\" <<< \"$TAG_OUT_POST\")")
+            lines.append(f"\\" <<< \\"$TAG_OUT_POST\\")")
             
-            lines.append(f"    if [ \"$POST_VAL\" = 'JSON_ERROR' ]; then")
+            lines.append(f"    if [ \\"$POST_VAL\\" = 'JSON_ERROR' ]; then")
             lines.append(f"        echo 'FAILED_POST_VERIFY: Malformed JSON'")
             lines.append(f"        FAILED_POST_VERIFY=$((FAILED_POST_VERIFY + 1))")
             lines.append(f"        return")
             lines.append(f"    fi")
             
             if a == "NOT_SET" or a is None:
-                lines.append(f"    if [ \"$POST_VAL\" != 'NOT_SET' ]; then")
+                lines.append(f"    if [ \\"$POST_VAL\\" != 'NOT_SET' ]; then")
                 lines.append(f"        echo 'FAILED_POST_VERIFY ({k} expected NOT_SET but was '$POST_VAL')'")
                 lines.append(f"        VERIFY_SAFE=0")
                 lines.append(f"    fi")
             else:
-                lines.append(f"    if [ \"$POST_VAL\" = 'NOT_SET' ]; then")
+                lines.append(f"    if [ \\"$POST_VAL\\" = 'NOT_SET' ]; then")
                 lines.append(f"        echo 'FAILED_POST_VERIFY ({k} expected {a} but was NOT_SET)'")
                 lines.append(f"        VERIFY_SAFE=0")
-                lines.append(f"    elif [ \"$POST_VAL\" != '{a}' ]; then")
+                lines.append(f"    elif [ \\"$POST_VAL\\" != '{a}' ]; then")
                 lines.append(f"        echo 'FAILED_POST_VERIFY ({k} expected {a} but was '$POST_VAL')'")
                 lines.append(f"        VERIFY_SAFE=0")
                 lines.append(f"    fi")
                 
-        lines.append(f"    if [ \"$VERIFY_SAFE\" -eq 1 ]; then")
+        lines.append(f"    if [ \\"$VERIFY_SAFE\\" -eq 1 ]; then")
         lines.append(f"        echo 'SUCCESS'")
         lines.append(f"        SUCCESS_COUNT=$((SUCCESS_COUNT + 1))")
         lines.append(f"    else")
@@ -254,27 +257,27 @@ def get_aws_apply_script(manifest: dict) -> str:
     lines.append("echo '=================================================='")
     lines.append("echo 'EXECUTION SUMMARY'")
     lines.append("echo '=================================================='")
-    lines.append("echo \"Total resources                 : $TOTAL\"")
-    lines.append("echo \"SUCCESS                         : $SUCCESS_COUNT\"")
-    lines.append("echo \"PRESERVED_NO_OP                 : $PRESERVED_NO_OP\"")
-    lines.append("echo \"SKIPPED_CURRENT_VALUE_CHANGED   : $SKIPPED_CURRENT_VALUE_CHANGED\"")
-    lines.append("echo \"FAILED_PRECHECK                 : $FAILED_PRECHECK\"")
-    lines.append("echo \"FAILED_WRITE                    : $FAILED_WRITE\"")
-    lines.append("echo \"FAILED_POST_VERIFY              : $FAILED_POST_VERIFY\"")
+    lines.append("echo \\"Total resources                 : $TOTAL\\"")
+    lines.append("echo \\"SUCCESS                         : $SUCCESS_COUNT\\"")
+    lines.append("echo \\"PRESERVED_NO_OP                 : $PRESERVED_NO_OP\\"")
+    lines.append("echo \\"SKIPPED_CURRENT_VALUE_CHANGED   : $SKIPPED_CURRENT_VALUE_CHANGED\\"")
+    lines.append("echo \\"FAILED_PRECHECK                 : $FAILED_PRECHECK\\"")
+    lines.append("echo \\"FAILED_WRITE                    : $FAILED_WRITE\\"")
+    lines.append("echo \\"FAILED_POST_VERIFY              : $FAILED_POST_VERIFY\\"")
     lines.append("echo ''")
     lines.append("echo 'ACTION SUMMARY'")
     lines.append("echo '--------------------------------------------------'")
-    lines.append("echo \"ADD       : $ADD_COUNT\"")
-    lines.append("echo \"CHANGE    : $CHANGE_COUNT\"")
-    lines.append("echo \"REMOVE    : $REMOVE_COUNT\"")
-    lines.append("echo \"PRESERVE  : $PRESERVE_COUNT\"")
+    lines.append("echo \\"ADD       : $ADD_COUNT\\"")
+    lines.append("echo \\"CHANGE    : $CHANGE_COUNT\\"")
+    lines.append("echo \\"REMOVE    : $REMOVE_COUNT\\"")
+    lines.append("echo \\"PRESERVE  : $PRESERVE_COUNT\\"")
     lines.append("echo '=================================================='")
-    lines.append("if [ \"$FAILED_PRECHECK\" -gt 0 ] || [ \"$FAILED_WRITE\" -gt 0 ] || [ \"$FAILED_POST_VERIFY\" -gt 0 ]; then")
+    lines.append("if [ \\"$FAILED_PRECHECK\\" -gt 0 ] || [ \\"$FAILED_WRITE\\" -gt 0 ] || [ \\"$FAILED_POST_VERIFY\\" -gt 0 ]; then")
     lines.append("    exit 1")
     lines.append("fi")
     lines.append("exit 0")
     
-    return "\n".join(lines) + "\n"
+    return "\\n".join(lines) + "\\n"
 
 def get_aws_revert_script(manifest: dict) -> str:
     inverted_manifest = json.loads(json.dumps(manifest))
@@ -310,7 +313,7 @@ def get_azure_apply_script(manifest: dict) -> str:
         "CloudTag V1 - Azure Apply Script",
         f"Job: {job_id}",
         "#>",
-        "$ErrorActionPreference = \"Continue\"",
+        "$ErrorActionPreference = \\"Continue\\"",
         "",
         "Write-Host 'Checking Azure Context...'",
         "$context = Get-AzContext -ErrorAction SilentlyContinue",
@@ -319,7 +322,7 @@ def get_azure_apply_script(manifest: dict) -> str:
         "    exit 1",
         "}",
         "$CurrentSub = $context.Subscription.Id",
-        "Write-Host \"Active Subscription: $CurrentSub\"",
+        "Write-Host \\"Active Subscription: $CurrentSub\\"",
         ""
     ]
     
@@ -484,27 +487,27 @@ def get_azure_apply_script(manifest: dict) -> str:
     lines.append("Write-Host '=================================================='")
     lines.append("Write-Host 'EXECUTION SUMMARY'")
     lines.append("Write-Host '=================================================='")
-    lines.append("Write-Host \"Total resources                 : $global:TOTAL\"")
-    lines.append("Write-Host \"SUCCESS                         : $global:SUCCESS_COUNT\"")
-    lines.append("Write-Host \"PRESERVED_NO_OP                 : $global:PRESERVED_NO_OP\"")
-    lines.append("Write-Host \"SKIPPED_CURRENT_VALUE_CHANGED   : $global:SKIPPED_CURRENT_VALUE_CHANGED\"")
-    lines.append("Write-Host \"FAILED_PRECHECK                 : $global:FAILED_PRECHECK\"")
-    lines.append("Write-Host \"FAILED_WRITE                    : $global:FAILED_WRITE\"")
-    lines.append("Write-Host \"FAILED_POST_VERIFY              : $global:FAILED_POST_VERIFY\"")
+    lines.append("Write-Host \\"Total resources                 : $global:TOTAL\\"")
+    lines.append("Write-Host \\"SUCCESS                         : $global:SUCCESS_COUNT\\"")
+    lines.append("Write-Host \\"PRESERVED_NO_OP                 : $global:PRESERVED_NO_OP\\"")
+    lines.append("Write-Host \\"SKIPPED_CURRENT_VALUE_CHANGED   : $global:SKIPPED_CURRENT_VALUE_CHANGED\\"")
+    lines.append("Write-Host \\"FAILED_PRECHECK                 : $global:FAILED_PRECHECK\\"")
+    lines.append("Write-Host \\"FAILED_WRITE                    : $global:FAILED_WRITE\\"")
+    lines.append("Write-Host \\"FAILED_POST_VERIFY              : $global:FAILED_POST_VERIFY\\"")
     lines.append("Write-Host ''")
     lines.append("Write-Host 'ACTION SUMMARY'")
     lines.append("Write-Host '--------------------------------------------------'")
-    lines.append("Write-Host \"ADD       : $global:ADD_COUNT\"")
-    lines.append("Write-Host \"CHANGE    : $global:CHANGE_COUNT\"")
-    lines.append("Write-Host \"REMOVE    : $global:REMOVE_COUNT\"")
-    lines.append("Write-Host \"PRESERVE  : $global:PRESERVE_COUNT\"")
+    lines.append("Write-Host \\"ADD       : $global:ADD_COUNT\\"")
+    lines.append("Write-Host \\"CHANGE    : $global:CHANGE_COUNT\\"")
+    lines.append("Write-Host \\"REMOVE    : $global:REMOVE_COUNT\\"")
+    lines.append("Write-Host \\"PRESERVE  : $global:PRESERVE_COUNT\\"")
     lines.append("Write-Host '=================================================='")
     lines.append("if ($global:FAILED_PRECHECK -gt 0 -or $global:FAILED_WRITE -gt 0 -or $global:FAILED_POST_VERIFY -gt 0) {")
     lines.append("    exit 1")
     lines.append("}")
     lines.append("exit 0")
     
-    return "\n".join(lines) + "\n"
+    return "\\n".join(lines) + "\\n"
 
 def get_azure_revert_script(manifest: dict) -> str:
     inverted_manifest = json.loads(json.dumps(manifest))
@@ -531,3 +534,8 @@ def get_azure_revert_script(manifest: dict) -> str:
                 
     script = get_azure_apply_script(inverted_manifest)
     return script.replace("Azure Apply Script", "Azure Revert Script")
+"""
+    with open('app/services/script_templates.py', 'w') as f:
+        f.write(code)
+
+generate_script_templates_code()

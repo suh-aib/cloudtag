@@ -146,7 +146,7 @@ def preview_bulk_tagging(
     for r in resources:
         current_tags = r.cloud_tags or {}
         for k, v in request.tags.items():
-            prev_value = current_tags.get(k, "ABSENT")
+            prev_value = current_tags.get(k, "NOT_SET")
             will_change = (prev_value != v)
             changes.append(PreviewResourceChange(
                 resource_id=r.id,
@@ -215,7 +215,7 @@ def create_bulk_tagging_proposal(
     for r in resources:
         current_tags = r.cloud_tags or {}
         for k, v in request.tags.items():
-            prev_value = current_tags.get(k, "ABSENT")
+            prev_value = current_tags.get(k, "NOT_SET")
             if prev_value != v:
                 change = TaggingChange(
                     batch_id=batch.id,

@@ -294,7 +294,7 @@ export default function BulkTaggingWizard() {
                           </td>
                           <td className="px-4 py-2 text-gray-600 font-mono text-xs">{change.tag_key}</td>
                           <td className="px-4 py-2 text-center">
-                            {change.current_value === 'ABSENT' ? (
+                            {change.current_value === 'NOT_SET' ? (
                               <div className="flex flex-col items-center">
                                 <span className="text-gray-400 italic text-xs font-medium">Not Set</span>
                                 {(() => {

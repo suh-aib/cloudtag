@@ -62,18 +62,21 @@ class ScriptGeneratorService:
             
             # The expected previous value (at approval time)
             before_val = change.previous_value
+            if before_val is None or before_val == "ABSENT":
+                before_val = "NOT_SET"
             after_val = change.approved_value or change.proposed_value
+            if after_val is None:
+                after_val = "NOT_SET"
             
             # Action inference
-            if before_val is None and after_val is not None:
-                action = "ADD"
-            elif before_val is not None and after_val is None:
-                action = "REMOVE"
-            elif before_val is not None and after_val is not None:
-                action = "CHANGE"
-            else:
-                # Both None? Shouldn't happen for approved changes, but map to PRESERVE just in case
+            if before_val == after_val:
                 action = "PRESERVE"
+            elif before_val == "NOT_SET" and after_val != "NOT_SET":
+                action = "ADD"
+            elif before_val != "NOT_SET" and after_val == "NOT_SET":
+                action = "REMOVE"
+            else:
+                action = "CHANGE"
                 
             resources_map[resource.id]["changes"].append({
                 "change_id": change.id,
@@ -229,26 +232,22 @@ class ScriptGeneratorService:
             # Add manifest
             zf.writestr("manifest.json", json.dumps(manifest, indent=2))
             
-            # Add README with token instruction
+            # Add README with instructions
             readme_content = (
                 f"# CloudTag Script Job: {manifest['job_id']}\n\n"
                 "## Execution Instructions\n"
-                "This script expects you to be authenticated in your terminal.\n\n"
-                f"**Ingestion Token**: `{token}`\n\n"
-                "Do NOT share this token. It will expire in 2 hours.\n"
-                "Pass this token when prompted or as an environment variable `CLOUDTAG_TOKEN`."
+                "This script expects you to be authenticated in your terminal against the respective cloud environment.\n\n"
+                "Run `apply.sh` or `apply.ps1` to apply the tags.\n"
             )
             zf.writestr("README.md", readme_content)
             
-            # Add Scripts
+            # Add apply and revert scripts
             from app.services import script_templates
-            if provider == "AWS":
-                import os
-                zf.writestr("apply.sh", script_templates.get_aws_apply_script())
-                zf.writestr("revert.sh", script_templates.get_aws_revert_script())
-            elif provider == "AZURE":
-                zf.writestr("apply.ps1", script_templates.get_azure_apply_script())
-                zf.writestr("revert.ps1", script_templates.get_azure_revert_script())
+            if provider == CloudProvider.AWS.value:
+                zf.writestr("apply.sh", script_templates.get_aws_apply_script(manifest))
+                zf.writestr("revert.sh", script_templates.get_aws_revert_script(manifest))
+            else:
+                zf.writestr("apply.ps1", script_templates.get_azure_apply_script(manifest))
+                zf.writestr("revert.ps1", script_templates.get_azure_revert_script(manifest))
         zip_buffer.seek(0)
         return zip_buffer
-

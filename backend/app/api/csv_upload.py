@@ -287,13 +287,13 @@ def execute_import(
                         m = target_map[idx]
                         field = m["target_field"]
                         if field == "cloud_tag":
-                            tag_key = m.get("target_tag_key") or header_name
-                            cloud_tags[tag_key] = val
+                            raw_key = m.get("target_tag_key") or header_name
+                            cloud_tags[raw_key.strip()] = val
                         elif field == "serialized_tags":
                             try:
                                 parsed_tags = json.loads(val)
                                 if isinstance(parsed_tags, dict):
-                                    cloud_tags.update({str(k): str(v) for k,v in parsed_tags.items()})
+                                    cloud_tags.update({str(k).strip(): str(v) for k,v in parsed_tags.items()})
                                 else:
                                     # Fallback to raw if it's not a dict
                                     raw_source[header_name] = val

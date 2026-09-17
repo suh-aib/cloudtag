@@ -143,14 +143,24 @@ def get_script_job_preview(
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
         
+    changes_query = db.query(TaggingChange, Resource, CloudAccount)\
+            .join(Resource, TaggingChange.resource_id == Resource.id)\
+            .join(CloudAccount, Resource.cloud_account_id == CloudAccount.id)\
+            .join(ScriptJobChange, TaggingChange.id == ScriptJobChange.change_id)\
+            .filter(ScriptJobChange.job_id == job.id)\
+            .order_by(Resource.id, TaggingChange.id)\
+            .all()
+            
+    manifest = ScriptGeneratorService._build_manifest(job_id, job.cloud, changes_query)
+
     from app.services import script_templates
     
-    if job.cloud.value == "AWS":
-        apply_script = script_templates.get_aws_apply_script()
-        revert_script = script_templates.get_aws_revert_script()
+    if job.cloud == CloudProvider.AWS:
+        apply_script = script_templates.get_aws_apply_script(manifest)
+        revert_script = script_templates.get_aws_revert_script(manifest)
     else:
-        apply_script = script_templates.get_azure_apply_script()
-        revert_script = script_templates.get_azure_revert_script()
+        apply_script = script_templates.get_azure_apply_script(manifest)
+        revert_script = script_templates.get_azure_revert_script(manifest)
         
     return {
         "apply_script": apply_script,
